@@ -29,10 +29,11 @@ from bs4 import BeautifulSoup, Tag
 
 from ai_act_navigator.download import download
 from ai_act_navigator.models import Chunk, ChunkType
+from ai_act_navigator.paths import DATA_DIR
 
 # Base link to the official text. Adding "#art_50" jumps straight to Article 50.
 EURLEX_URL = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689"
-OUTPUT_PATH = Path("data/chunks.jsonl")
+OUTPUT_PATH = DATA_DIR / "chunks.jsonl"
 
 # About 750 tokens. Articles and annexes longer than this are split into smaller parts.
 MAX_CHARS = 3000

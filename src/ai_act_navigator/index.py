@@ -12,13 +12,14 @@ from pathlib import Path
 from typing import Protocol
 
 import chromadb
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 from chromadb.config import Settings
 
 from ai_act_navigator import chunk
 from ai_act_navigator.models import Chunk
+from ai_act_navigator.paths import DATA_DIR
 
-CHROMA_PATH = Path("data/chroma")
+CHROMA_PATH = DATA_DIR / "chroma"
 COLLECTION_NAME = "ai_act"  # a "collection" is like a table in a normal database
 
 

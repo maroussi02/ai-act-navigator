@@ -8,8 +8,10 @@ from pathlib import Path
 
 import httpx
 
+from ai_act_navigator.paths import DATA_DIR
+
 SOURCE_URL = "http://publications.europa.eu/resource/celex/32024R1689"
-DEFAULT_PATH = Path("data/raw/ai_act.html")  # git-ignored; can always be downloaded again
+DEFAULT_PATH = DATA_DIR / "raw" / "ai_act.html"  # can always be downloaded again
 TIMEOUT_SECONDS = 60  # give up instead of hanging forever if the server doesn't answer
 
 

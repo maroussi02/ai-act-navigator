@@ -14,6 +14,15 @@ from sentence_transformers import SentenceTransformer
 # Small, fast, good-quality English model. Swap it here to try another one.
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
+# Exact version (git commit) of the model on Hugging Face. Pinning it means we always get
+# the same files: results stay reproducible, and a later change to the model repo (even a
+# malicious one) can't silently swap what we run. Update it on purpose, never by accident.
+MODEL_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+
+# Recommended by the model's publisher (BAAI) for short questions that search longer
+# passages. The model's own config leaves the query prompt empty, so we add it ourselves.
+QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
+
 
 class Embedder:
     """Wraps the embedding model so the rest of the code doesn't depend on the library.
@@ -22,10 +31,10 @@ class Embedder:
     e.g. the FakeEmbedder in the tests, which needs no model download.
     """
 
-    def __init__(self, model_name: str = MODEL_NAME) -> None:
+    def __init__(self, model_name: str = MODEL_NAME, revision: str = MODEL_REVISION) -> None:
         # trust_remote_code=False (the default) means we never run code shipped with the
         # model, we only load its weights. Kept explicit here for security.
-        self._model = SentenceTransformer(model_name, trust_remote_code=False)
+        self._model = SentenceTransformer(model_name, revision=revision, trust_remote_code=False)
 
     @property
     def max_tokens(self) -> int:
@@ -45,10 +54,11 @@ class Embedder:
     def embed_query(self, text: str) -> list[float]:
         """Embedding for a user's question.
 
-        Separate from embed_documents because some models (like this one) add a short
-        instruction to questions so they match the right passages better.
+        Separate from embed_documents because questions get QUERY_INSTRUCTION in front:
+        a short question and a long legal paragraph look different, and the instruction
+        tells the model to match them by meaning anyway.
         """
-        return self._model.encode_query(text, normalize_embeddings=True).tolist()
+        return self._model.encode(QUERY_INSTRUCTION + text, normalize_embeddings=True).tolist()
 
     def count_truncated(self, texts: list[str]) -> int:
         """How many texts are longer than max_tokens, so their end is ignored by the model.

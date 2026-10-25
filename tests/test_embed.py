@@ -6,7 +6,7 @@ Skip these locally with:  uv run pytest -m "not integration"
 
 import pytest
 
-from ai_act_navigator.embed import Embedder
+from ai_act_navigator.embed import MODEL_REVISION, Embedder
 
 pytestmark = pytest.mark.integration
 
@@ -37,3 +37,14 @@ def test_question_is_closer_to_the_matching_article(embedder):
 
 def test_long_texts_are_counted_as_truncated(embedder):
     assert embedder.count_truncated(["short text", "word " * 2000]) == 1
+
+
+def test_query_gets_the_search_instruction(embedder):
+    # The model's own config adds nothing to queries, so embed_query must add the
+    # instruction itself: a query must differ from the same text embedded as a document.
+    text = "Which AI practices are banned?"
+    assert embedder.embed_query(text) != embedder.embed_documents([text])[0]
+
+
+def test_model_is_pinned_to_an_exact_version():
+    assert len(MODEL_REVISION) == 40  # a full git commit hash, not a moving name like "main"

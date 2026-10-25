@@ -33,7 +33,7 @@ Build the search index (embeds every chunk and stores it in a local Chroma datab
 
 ```bash
 uv run python -m ai_act_navigator.index
-# Indexed 821 chunks into data/chroma (24 truncated at 512 tokens) in 20s
+# Indexed 821 chunks into …/data/chroma (24 truncated at 512 tokens) in 20s
 ```
 
 An **embedding** is a list of numbers that captures what a text means, so texts with similar meaning end up close together. The model ([BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5)) runs locally. It's downloaded once from Hugging Face (about 130 MB), and no text leaves your machine. Chroma is a library that stores the vectors as files in `data/chroma/`, with no account or server.
