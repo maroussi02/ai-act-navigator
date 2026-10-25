@@ -1,4 +1,8 @@
-"""Checks on the full official text. Skipped unless it was downloaded first:
+"""INTEGRATION TESTS: parse() on the full, real AI Act (1.2 MB).
+
+They catch problems the small sample in the unit tests can't, e.g. an article with an
+unusual structure. Slower (about a second) and need the downloaded file. Skipped unless
+it was downloaded first (CI downloads it before running tests):
 
 uv run python -m ai_act_navigator.download
 """

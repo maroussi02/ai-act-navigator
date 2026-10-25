@@ -1,4 +1,9 @@
-"""Tests for chunking, run on a small excerpt of the real text (no internet needed)."""
+"""UNIT TESTS for chunk.py.
+
+They run parse() on a small excerpt of the real law (tests/fixtures/sample.html):
+Recital 1, Articles 3, 4 and 50, Annexes III and VI. No internet, runs in milliseconds.
+If one fails, the test name tells you which chunking rule broke.
+"""
 
 from pathlib import Path
 
@@ -11,12 +16,15 @@ from ai_act_navigator.models import Chunk
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.html"
 
 
+# A pytest "fixture" prepares data for tests. Any test with a `chunks` argument receives
+# this list. scope="module" = parse the file once and share it across all tests in this file.
 @pytest.fixture(scope="module")
 def chunks() -> list[Chunk]:
     return parse(FIXTURE.read_text(encoding="utf-8"))
 
 
 def by_ref(chunks: list[Chunk], ref: str) -> list[Chunk]:
+    """Helper: all chunks with this citation, e.g. "Art. 50(1)"."""
     return [c for c in chunks if c.ref == ref]
 
 
@@ -71,6 +79,7 @@ def test_split_parts_respect_size_limit_roughly(chunks):
     assert max(len(c.text) for c in split_parts) < 2 * MAX_CHARS
 
 
+# parametrize = run the same test once per (marker, expected) pair below.
 @pytest.mark.parametrize(
     ("marker", "expected"),
     [("(a)", "point (a)"), ("(12)", "point (12)"), ("3.", "point 3")],

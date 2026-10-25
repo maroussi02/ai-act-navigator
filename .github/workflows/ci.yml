@@ -36,5 +36,12 @@ jobs:
       - name: Download the official AI Act text
         run: uv run python -m ai_act_navigator.download
 
-      - name: Run tests
+      - name: Run tests (unit + integration)
         run: uv run pytest
+
+      # Smoke test: run the real command like a user would and check it produced output.
+      # Catches "all tests green but the program crashes" (e.g. a broken main()).
+      - name: Smoke test - chunking command
+        run: |
+          uv run python -m ai_act_navigator.chunk
+          test -s data/chunks.jsonl || { echo "data/chunks.jsonl is missing or empty"; exit 1; }

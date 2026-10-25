@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
+# Literal = only these exact strings are allowed (a type checker would flag "articel").
 ChunkType = Literal["article", "recital", "annex"]
 
 
@@ -10,7 +11,8 @@ ChunkType = Literal["article", "recital", "annex"]
 class Chunk:
     """One citable piece of the AI Act, e.g. a single article paragraph.
 
-    Frozen so a chunk can't be changed by accident after parsing.
+    A dataclass is a class that just holds data: Python writes __init__, ==, and the
+    printout for us. Frozen = read-only, so a chunk can't be changed by accident later.
     """
 
     id: str  # stable, unique key, e.g. "art-50-1"

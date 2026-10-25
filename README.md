@@ -37,4 +37,12 @@ uv run ruff check .    # lint
 uv run ruff format .   # format
 ```
 
-CI runs the secret scan, lint, format check and tests on every pull request.
+CI runs the secret scan, lint, format check, tests and a smoke test on every pull request.
+
+### Tests
+
+| Type | What it checks | Where |
+|---|---|---|
+| Unit | One function alone, small or fake input, milliseconds | `tests/test_chunk.py`, `tests/test_download.py` |
+| Integration | The parts together on the real law (all articles found, no text lost) | `tests/test_full_text.py` (needs the downloaded text) |
+| Smoke | The real command runs and produces output | CI step "Smoke test" |

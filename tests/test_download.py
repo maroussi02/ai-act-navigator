@@ -1,4 +1,9 @@
-"""Tests for download.py. No real network calls: httpx.get is replaced by a fake."""
+"""UNIT TESTS for download.py.
+
+No real network calls: `monkeypatch` swaps httpx.get for a fake during each test.
+That keeps tests fast, offline-proof, and lets us simulate a server error (503) on purpose.
+`tmp_path` is a fresh temporary folder pytest creates per test, so no real files are touched.
+"""
 
 import httpx
 import pytest
