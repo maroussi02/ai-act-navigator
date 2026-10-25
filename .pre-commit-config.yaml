@@ -1,0 +1,6 @@
+# Runs before every commit on your laptop. Install once with: uv run pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks # blocks the commit if it contains an API key or other secret
