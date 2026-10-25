@@ -1,7 +1,7 @@
 """UNIT TESTS for chunk.py.
 
 They run parse() on a small excerpt of the real law (tests/fixtures/sample.html):
-Recital 1, Articles 3, 4 and 50, Annexes III and VI. No internet, runs in milliseconds.
+Recitals 1 and 53, Articles 3, 4, 5 and 50, Annexes III and VI. No internet, runs in milliseconds.
 If one fails, the test name tells you which chunking rule broke.
 """
 
@@ -73,10 +73,25 @@ def test_every_chunk_has_text_and_a_unique_id(chunks):
     assert len({c.id for c in chunks}) == len(chunks)
 
 
-def test_split_parts_respect_size_limit_roughly(chunks):
-    # Parts can exceed MAX_CHARS only when a single point is that long on its own.
-    split_parts = [c for c in chunks if "point" in c.ref]
-    assert max(len(c.text) for c in split_parts) < 2 * MAX_CHARS
+def test_no_chunk_is_longer_than_the_limit(chunks):
+    assert max(len(c.text) for c in chunks) <= MAX_CHARS
+
+
+def test_long_paragraph_is_split_by_point(chunks):
+    # Art. 5(1) lists the banned AI practices (a)-(h). As one chunk, the model would only
+    # read the first 512 tokens and never "see" points (g) and (h).
+    refs = [c.ref for c in chunks if c.ref.startswith("Art. 5(1)")]
+    assert refs == [f"Art. 5(1), point ({letter})" for letter in "abcdefgh"]
+    point_h = by_ref(chunks, "Art. 5(1), point (h)")[0]
+    assert point_h.text.startswith("1. The following AI practices shall be prohibited:")
+    assert "‘real-time’ remote biometric identification" in point_h.text
+
+
+def test_long_text_without_points_is_split_by_sentences(chunks):
+    parts = by_ref(chunks, "Recital 53")  # about 4,400 characters, no points to split by
+    assert len(parts) > 1
+    assert [p.id for p in parts] == [f"rct-53-s{i}" for i in range(1, len(parts) + 1)]
+    assert all(p.text.endswith((".", ";")) for p in parts)  # cut between sentences only
 
 
 # parametrize = run the same test once per (marker, expected) pair below.

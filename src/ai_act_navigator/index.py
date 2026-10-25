@@ -64,7 +64,7 @@ def build_index(
     """Embed all chunks and save them with their citation data. Safe to run again.
 
     `upsert` = insert, or update if the id already exists. So running this twice
-    doesn't create duplicates, it just refreshes the same 821 entries.
+    doesn't create duplicates, it just refreshes the existing entries.
     """
     collection = open_collection(path)
 
