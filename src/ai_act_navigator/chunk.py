@@ -22,20 +22,25 @@ import json
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
 from ai_act_navigator.download import download
 from ai_act_navigator.models import Chunk, ChunkType
+from ai_act_navigator.paths import DATA_DIR
 
 # Base link to the official text. Adding "#art_50" jumps straight to Article 50.
 EURLEX_URL = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689"
-OUTPUT_PATH = Path("data/chunks.jsonl")
+OUTPUT_PATH = DATA_DIR / "chunks.jsonl"
 
-# About 750 tokens. Articles and annexes longer than this are split into smaller parts.
-MAX_CHARS = 3000
+# The embedding model only reads the first 512 tokens of a text and ignores the rest.
+# Legal English averages ~5 characters per token (measured on this law), but references
+# like "Regulation (EU) 2019/2144" use more tokens, so we stay well below: 1,800 characters
+# is ~360 tokens on average. tests/test_full_text.py checks with the real tokenizer that
+# no chunk is cut off.
+MAX_CHARS = 1800
 
 # Patterns for the div ids. The part in (...) is "captured" so we can read the number out.
 ARTICLE_ID = re.compile(r"^art_(\d+)$")  # "art_50"  -> 50
@@ -47,12 +52,15 @@ ANNEX_ID = re.compile(r"^anx_([IVXL]+)$")  # "anx_III" -> III (roman numeral)
 def parse(html: str) -> list[Chunk]:
     """Turn the official XHTML text into chunks, in reading order.
 
-    This is the only public function: HTML text in, list of chunks out. It reads no files
-    and calls no network ("pure function"), which makes it easy to test.
+    HTML text in, list of chunks out. It reads no files and calls no network
+    ("pure function"), which makes it easy to test.
     """
     # "lxml-xml" because the official file is XHTML (strict XML), not loose web HTML.
     soup = BeautifulSoup(html, "lxml-xml")
-    return [*_recitals(soup), *_articles(soup), *_annexes(soup)]
+    chunks = [*_recitals(soup), *_articles(soup), *_annexes(soup)]
+    # Last safety net: anything still too long (e.g. a long recital, which has no points
+    # to split by) is split into sentence groups that keep the same citation.
+    return [part for c in chunks for part in _split_by_sentences(c)]
 
 
 def _recitals(soup: BeautifulSoup) -> list[Chunk]:
@@ -94,15 +102,16 @@ def _articles(soup: BeautifulSoup) -> list[Chunk]:
         if paragraphs:
             for paragraph in paragraphs:
                 para = int(PARAGRAPH_ID.match(paragraph["id"]).group(1))  # "001" -> 1
-                chunks.append(
-                    Chunk(
-                        id=f"art-{number}-{para}",
-                        type="article",
-                        ref=f"Art. {number}({para})",
-                        title=title,
-                        text=_text(paragraph),
-                        url=url,
-                    )
+                # A long paragraph (e.g. Art. 5(1), the list of banned practices) is split
+                # by point: "Art. 5(1), point (h)". Short ones stay whole: "Art. 50(1)".
+                chunks += _whole_or_split(
+                    id_prefix=f"art-{number}-{para}",
+                    chunk_type="article",
+                    ref=f"Art. {number}({para})",
+                    title=title,
+                    url=url,
+                    body=paragraph.find_all(recursive=False),
+                    is_boundary=_is_table,
                 )
             continue  # this article is done, go to the next one
 
@@ -217,6 +226,28 @@ def _split_long(body: list[Tag], is_boundary: Callable[[Tag], bool]) -> list[tup
     return [(_label(group[0]), _text_of(intro + group)) for group in groups]
 
 
+def _split_by_sentences(chunk: Chunk) -> list[Chunk]:
+    """Split a chunk that is still longer than MAX_CHARS into groups of whole sentences.
+
+    Each part keeps the same citation (a recital is cited as "Recital 53", whichever
+    sentence you quote) and gets a "-s1", "-s2", ... id. Short chunks are returned as is.
+    """
+    if len(chunk.text) <= MAX_CHARS:
+        return [chunk]
+
+    # Split after ". " or "; " (legal lists end items with ";"), keeping the punctuation.
+    sentences = re.split(r"(?<=[.;])\s+", chunk.text)
+    groups: list[str] = []
+    for sentence in sentences:
+        if groups and len(groups[-1]) + 1 + len(sentence) <= MAX_CHARS:
+            groups[-1] += " " + sentence
+        else:
+            groups.append(sentence)
+    return [
+        replace(chunk, id=f"{chunk.id}-s{i}", text=text) for i, text in enumerate(groups, start=1)
+    ]
+
+
 def _label(el: Tag) -> str:
     """Citation label for the element that starts a part.
 
@@ -271,17 +302,29 @@ def _url(anchor: str) -> str:
     return f"{EURLEX_URL}#{anchor}"
 
 
-def main() -> None:
-    """Download the law (if needed), chunk it, and save one JSON object per line."""
-    html = download().read_text(encoding="utf-8")
-    chunks = parse(html)
-
-    # JSONL = one JSON object per line. Easy to read line by line and to grep.
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_PATH.open("w", encoding="utf-8") as f:
+def save_chunks(chunks: list[Chunk], path: Path) -> None:
+    """Save chunks as JSONL: one JSON object per line. Easy to read line by line and to grep."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
         for chunk in chunks:
             # ensure_ascii=False keeps characters like ‘ ’ readable instead of ‘.
             f.write(json.dumps(asdict(chunk), ensure_ascii=False) + "\n")
+
+
+def load_chunks(path: Path) -> list[Chunk]:
+    """Read chunks back from a JSONL file written by save_chunks.
+
+    Chunk(**data) turns {"id": ..., "ref": ...} into Chunk(id=..., ref=...).
+    """
+    with path.open(encoding="utf-8") as f:
+        return [Chunk(**json.loads(line)) for line in f if line.strip()]
+
+
+def main() -> None:
+    """Download the law (if needed), chunk it, and save the chunks to OUTPUT_PATH."""
+    html = download().read_text(encoding="utf-8")
+    chunks = parse(html)
+    save_chunks(chunks, OUTPUT_PATH)
 
     counts = Counter(chunk.type for chunk in chunks)
     print(f"Wrote {len(chunks)} chunks to {OUTPUT_PATH}: {dict(counts)}")
