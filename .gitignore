@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Downloaded and generated data (recreate with: uv run python -m ai_act_navigator.chunk)
+data/
