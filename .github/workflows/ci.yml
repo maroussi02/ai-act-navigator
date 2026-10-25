@@ -27,6 +27,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # Keep the embedding model (~130 MB) between runs instead of downloading it every time.
+      - name: Cache the embedding model
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-bge-small-en-v1.5
+
       - name: Lint
         run: uv run ruff check .
 
@@ -45,3 +52,6 @@ jobs:
         run: |
           uv run python -m ai_act_navigator.chunk
           test -s data/chunks.jsonl || { echo "data/chunks.jsonl is missing or empty"; exit 1; }
+
+      - name: Smoke test - index command
+        run: uv run python -m ai_act_navigator.index | tee index.log && grep -q "Indexed 821 chunks" index.log

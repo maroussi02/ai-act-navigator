@@ -29,10 +29,20 @@ uv run python -m ai_act_navigator.chunk
 
 Each line of `data/chunks.jsonl` is one citable piece, e.g. `Art. 50(1)`, `Art. 3, point (1)`, `Recital 12` or `Annex III, point 1`.
 
+Build the search index (embeds every chunk and stores it in a local Chroma database):
+
+```bash
+uv run python -m ai_act_navigator.index
+# Indexed 821 chunks into data/chroma (24 truncated at 512 tokens) in 20s
+```
+
+An **embedding** is a list of numbers that captures what a text means, so texts with similar meaning end up close together. The model ([BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5)) runs locally. It's downloaded once from Hugging Face (about 130 MB), and no text leaves your machine. Chroma is a library that stores the vectors as files in `data/chroma/`, with no account or server.
+
 ## Development
 
 ```bash
-uv run pytest          # tests
+uv run pytest          # all tests
+uv run pytest -m "not integration"   # only the fast unit tests
 uv run ruff check .    # lint
 uv run ruff format .   # format
 ```

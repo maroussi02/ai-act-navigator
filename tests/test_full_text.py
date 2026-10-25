@@ -16,7 +16,10 @@ from bs4 import BeautifulSoup
 from ai_act_navigator.chunk import parse
 from ai_act_navigator.download import DEFAULT_PATH
 
-pytestmark = pytest.mark.skipif(not DEFAULT_PATH.exists(), reason="full text not downloaded")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not DEFAULT_PATH.exists(), reason="full text not downloaded"),
+]
 
 
 def test_all_parts_of_the_law_are_found():

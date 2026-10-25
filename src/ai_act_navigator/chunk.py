@@ -271,17 +271,29 @@ def _url(anchor: str) -> str:
     return f"{EURLEX_URL}#{anchor}"
 
 
-def main() -> None:
-    """Download the law (if needed), chunk it, and save one JSON object per line."""
-    html = download().read_text(encoding="utf-8")
-    chunks = parse(html)
-
-    # JSONL = one JSON object per line. Easy to read line by line and to grep.
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_PATH.open("w", encoding="utf-8") as f:
+def save_chunks(chunks: list[Chunk], path: Path) -> None:
+    """Save chunks as JSONL: one JSON object per line. Easy to read line by line and to grep."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
         for chunk in chunks:
             # ensure_ascii=False keeps characters like ‘ ’ readable instead of ‘.
             f.write(json.dumps(asdict(chunk), ensure_ascii=False) + "\n")
+
+
+def load_chunks(path: Path) -> list[Chunk]:
+    """Read chunks back from a JSONL file written by save_chunks.
+
+    Chunk(**data) turns {"id": ..., "ref": ...} into Chunk(id=..., ref=...).
+    """
+    with path.open(encoding="utf-8") as f:
+        return [Chunk(**json.loads(line)) for line in f if line.strip()]
+
+
+def main() -> None:
+    """Download the law (if needed), chunk it, and save the chunks to OUTPUT_PATH."""
+    html = download().read_text(encoding="utf-8")
+    chunks = parse(html)
+    save_chunks(chunks, OUTPUT_PATH)
 
     counts = Counter(chunk.type for chunk in chunks)
     print(f"Wrote {len(chunks)} chunks to {OUTPUT_PATH}: {dict(counts)}")
