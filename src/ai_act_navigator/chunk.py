@@ -18,7 +18,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup, Tag
 
 from ai_act_navigator.download import download
-from ai_act_navigator.models import Chunk
+from ai_act_navigator.models import Chunk, ChunkType
 
 EURLEX_URL = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689"
 OUTPUT_PATH = Path("data/chunks.jsonl")
@@ -83,22 +83,15 @@ def _articles(soup: BeautifulSoup) -> list[Chunk]:
             for el in div.find_all(recursive=False)
             if not (_has_class(el, "oj-ti-art") or _has_class(el, "eli-title"))
         ]
-        parts = _split_long(body, is_boundary=lambda el: el.name == "table")
-        if not parts:
-            chunks.append(
-                Chunk(f"art-{number}", "article", f"Art. {number}", title, _text_of(body), url)
-            )
-        for i, (label, text) in enumerate(parts, start=1):
-            chunks.append(
-                Chunk(
-                    id=f"art-{number}-p{i}",
-                    type="article",
-                    ref=f"Art. {number}, point {label}",
-                    title=title,
-                    text=text,
-                    url=url,
-                )
-            )
+        chunks += _whole_or_split(
+            id_prefix=f"art-{number}",
+            chunk_type="article",
+            ref=f"Art. {number}",
+            title=title,
+            url=url,
+            body=body,
+            is_boundary=_is_table,
+        )
     return chunks
 
 
@@ -113,31 +106,45 @@ def _annexes(soup: BeautifulSoup) -> list[Chunk]:
         body = [el for el in div.find_all(recursive=False) if not _has_class(el, "oj-doc-ti")]
 
         has_sections = any(_is_section_heading(el) for el in body)
-        boundary = _is_section_heading if has_sections else (lambda el: el.name == "table")
-        parts = _split_long(body, is_boundary=boundary)
-        if not parts:
-            chunks.append(
-                Chunk(
-                    f"anx-{numeral.lower()}",
-                    "annex",
-                    f"Annex {numeral}",
-                    title,
-                    _text_of(body),
-                    url,
-                )
-            )
-        for i, (label, text) in enumerate(parts, start=1):
-            chunks.append(
-                Chunk(
-                    id=f"anx-{numeral.lower()}-p{i}",
-                    type="annex",
-                    ref=f"Annex {numeral}, {label}",
-                    title=title,
-                    text=text,
-                    url=url,
-                )
-            )
+        chunks += _whole_or_split(
+            id_prefix=f"anx-{numeral.lower()}",
+            chunk_type="annex",
+            ref=f"Annex {numeral}",
+            title=title,
+            url=url,
+            body=body,
+            is_boundary=_is_section_heading if has_sections else _is_table,
+        )
     return chunks
+
+
+def _whole_or_split(
+    *,
+    id_prefix: str,
+    chunk_type: ChunkType,
+    ref: str,
+    title: str,
+    url: str,
+    body: list[Tag],
+    is_boundary: Callable[[Tag], bool],
+) -> list[Chunk]:
+    """One chunk for a short body, or one chunk per part ("Art. 3, point (1)") for a long one."""
+    parts = _split_long(body, is_boundary)
+    if not parts:
+        return [
+            Chunk(id=id_prefix, type=chunk_type, ref=ref, title=title, text=_text_of(body), url=url)
+        ]
+    return [
+        Chunk(
+            id=f"{id_prefix}-p{i}",
+            type=chunk_type,
+            ref=f"{ref}, {label}",
+            title=title,
+            text=text,
+            url=url,
+        )
+        for i, (label, text) in enumerate(parts, start=1)
+    ]
 
 
 def _split_long(body: list[Tag], is_boundary: Callable[[Tag], bool]) -> list[tuple[str, str]]:
@@ -167,12 +174,10 @@ def _split_long(body: list[Tag], is_boundary: Callable[[Tag], bool]) -> list[tup
 
 
 def _label(el: Tag) -> str:
-    """Citation label for a part: "(1)", "point 3" or "Section A"."""
-    if el.name == "table":
+    """Citation label for a part: "point (a)", "point 3" or "Section A"."""
+    if _is_table(el):
         marker = _text(el.find("td"))  # first cell holds the point marker, e.g. "(a)" or "3."
-        return (
-            f"({marker.strip('().')})" if marker.startswith("(") else f"point {marker.strip('.')}"
-        )
+        return f"point {marker.rstrip('.')}"
 
     heading = _text(el)
     if section := re.match(r"Section \w+", heading):
@@ -180,6 +185,10 @@ def _label(el: Tag) -> str:
     if number := re.match(r"(\d+)\.", heading):
         return f"point {number.group(1)}"
     return heading[:40]
+
+
+def _is_table(el: Tag) -> bool:
+    return el.name == "table"
 
 
 def _is_section_heading(el: Tag) -> bool:

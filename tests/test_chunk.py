@@ -3,8 +3,9 @@
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 
-from ai_act_navigator.chunk import MAX_CHARS, parse
+from ai_act_navigator.chunk import MAX_CHARS, _label, parse
 from ai_act_navigator.models import Chunk
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.html"
@@ -68,3 +69,12 @@ def test_split_parts_respect_size_limit_roughly(chunks):
     # Parts can exceed MAX_CHARS only when a single point is that long on its own.
     split_parts = [c for c in chunks if "point" in c.ref]
     assert max(len(c.text) for c in split_parts) < 2 * MAX_CHARS
+
+
+@pytest.mark.parametrize(
+    ("marker", "expected"),
+    [("(a)", "point (a)"), ("(12)", "point (12)"), ("3.", "point 3")],
+)
+def test_point_labels(marker, expected):
+    table = BeautifulSoup(f"<table><tr><td><p>{marker}</p></td></tr></table>", "lxml-xml").table
+    assert _label(table) == expected
