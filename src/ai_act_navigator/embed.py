@@ -32,6 +32,9 @@ class Embedder:
     """
 
     def __init__(self, model_name: str = MODEL_NAME, revision: str = MODEL_REVISION) -> None:
+        # e.g. "BAAI/bge-small-en-v1.5@5c38ec7...". The index records it, so search can
+        # refuse to compare vectors made by two different models (they'd be meaningless).
+        self.model_id = f"{model_name}@{revision}"
         # trust_remote_code=False (the default) means we never run code shipped with the
         # model, we only load its weights. Kept explicit here for security.
         self._model = SentenceTransformer(model_name, revision=revision, trust_remote_code=False)
