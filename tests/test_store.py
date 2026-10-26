@@ -46,3 +46,16 @@ def test_search_refuses_an_index_built_with_another_model(store, tmp_path):
 def test_search_on_an_empty_index_explains_what_to_do(tmp_path):
     with pytest.raises(IndexMismatchError, match="empty"):
         VectorStore("model-a", tmp_path).search([1.0, 0.0])
+
+
+def test_index_from_an_older_version_asks_for_a_rebuild(tmp_path):
+    # Built before the store recorded its model: it has chunks, but no model information.
+    store = VectorStore("model-a", tmp_path)
+    store._collection.upsert(
+        ids=["x"],
+        embeddings=[[1.0, 0.0]],
+        documents=["t"],
+        metadatas=[{"ref": "r", "type": "article", "title": "", "url": "u"}],
+    )
+    with pytest.raises(IndexMismatchError, match="older version"):
+        store.search([1.0, 0.0])

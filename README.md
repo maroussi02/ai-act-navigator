@@ -58,7 +58,7 @@ claude-sonnet-5-5 · 3246 tokens in, 513 out · cost $0.0116
 
 How it works:
 1. **Search:** the question is embedded with the same local model, and the 5 closest chunks are taken from the index.
-2. **Answer:** the chunks go to Claude (`claude-sonnet-5-5`, set in `answer.py`) as *search result* blocks with citations enabled. Claude's answer comes back with citations that point to those exact chunks, so it can't cite an article it wasn't given.
+2. **Answer:** the chunks go to Claude (`claude-sonnet-5-5`, set in `answer.py`) as *search result* blocks with citations enabled. Claude's answer comes back with citations that point to those exact chunks, so every numbered source is a chunk it was given. (The prose could still name another article; the prompt forbids it, and AN-002 measures it.)
 3. **Not covered:** if the chunks don't answer the question, Claude says so instead of guessing (e.g. "What is the VAT rate in Germany?").
 
 A question costs about $0.01 at list prices.
@@ -67,7 +67,7 @@ A question costs about $0.01 at list prices.
 ```bash
 uv run pytest          # all tests
 uv run pytest -m "not integration"   # only the fast unit tests
-uv run pytest -m paid               # one real Claude call (~$0.01), never in CI
+uv run pytest --run-paid -m paid     # one real Claude call (~$0.01); skipped unless --run-paid
 uv run ruff check .    # lint
 uv run ruff format .   # format
 ```
@@ -81,4 +81,4 @@ CI runs the secret scan, lint, format check, tests and a smoke test on every pul
 | Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_load_chunks.py`, `test_paths.py` |
 | Integration | The parts together on real data or the real model | `test_full_text.py` (all parts found, no text lost, nothing cut off), `test_embed.py` |
 | Smoke | The real commands run and produce output | CI steps "Smoke test" (chunk and index) |
-| Paid smoke | One real question to Claude cites Art. 50(1) | `test_live_answer.py`, run by hand with `-m paid` |
+| Paid smoke | One real question to Claude cites Art. 50(1) | `test_live_answer.py`, run by hand with `--run-paid -m paid` |

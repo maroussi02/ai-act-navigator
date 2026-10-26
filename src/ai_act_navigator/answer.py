@@ -3,8 +3,9 @@
 How citations work: each retrieved chunk is sent as a "search result" block (Claude API
 feature built for RAG). With citations enabled, Claude's answer comes back in pieces,
 and every piece that uses a chunk carries a citation pointing to that chunk's position in
-our list plus the exact quoted text. So a citation can only ever point to a chunk we sent;
-Claude can't invent "Art. 99(12)".
+our list plus the exact quoted text. So the numbered sources can only ever be chunks we
+sent. (The answer *text* could still mention another article by name; the prompt tells
+Claude not to, and AN-002's checks will measure how often it happens.)
 
 Run it:  uv run python -m ai_act_navigator.answer "Does a chatbot have to tell users it is an AI?"
 """
@@ -12,9 +13,10 @@ Run it:  uv run python -m ai_act_navigator.answer "Does a chatbot have to tell u
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from anthropic import Anthropic
+from anthropic.types.beta import BetaMessage
 
 from ai_act_navigator.models import Hit
 from ai_act_navigator.prompts import SYSTEM_PROMPT
@@ -22,13 +24,24 @@ from ai_act_navigator.prompts import SYSTEM_PROMPT
 # One setting to switch models. AN-002 compares Haiku, Sonnet and Opus on the golden set.
 MODEL = "claude-sonnet-5-5"
 
+# How much the model thinks before answering. "medium" is a balanced start; AN-002 will
+# measure whether "low" is good enough (cheaper and faster).
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+EFFORT: Effort = "medium"
+
 # USD per 1 million tokens (input, output). Anthropic list prices, checked 2026-10-26.
 # Used only to show what a question costs; update when prices change.
 PRICES_PER_MILLION = {
     "claude-haiku-5-5": (0.10, 0.50),  # for prompts up to 100K tokens
     "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-sonnet-5": (2.00, 10.00),  # can answer instead of Sonnet 5.5 via the fallback
     "claude-opus-5-5": (4.00, 20.00),
 }
+# Prompt caching changes the input price: writing to the cache costs 1.25x, reading 0.1x.
+CACHE_WRITE_FACTOR = 1.25
+CACHE_READ_FACTOR = 0.1
+
+DECLINED = "Claude declined to answer this question."
 
 
 class AnswerError(Exception):
@@ -42,7 +55,7 @@ class Citation:
     number: int
     ref: str  # e.g. "Art. 50(1)"
     url: str
-    cited_text: str  # the exact text Claude relied on, quoted from our chunk
+    quotes: tuple[str, ...]  # every exact passage Claude relied on, quoted from our chunk(s)
 
 
 @dataclass(frozen=True)
@@ -75,7 +88,13 @@ def build_sources(hits: list[Hit]) -> list[dict[str, Any]]:
     ]
 
 
-def answer(question: str, hits: list[Hit], client: Anthropic, model: str = MODEL) -> Answer:
+def answer(
+    question: str,
+    hits: list[Hit],
+    client: Anthropic,
+    model: str = MODEL,
+    effort: Effort = EFFORT,
+) -> Answer:
     """Ask Claude the question, giving it only the retrieved chunks as sources."""
     response = client.beta.messages.create(
         model=model,
@@ -87,18 +106,17 @@ def answer(question: str, hits: list[Hit], client: Anthropic, model: str = MODEL
                 "content": [*build_sources(hits), {"type": "text", "text": question}],
             }
         ],
-        # How much the model thinks before answering. "medium" is a balanced start;
-        # AN-002 will measure whether "low" is good enough (cheaper and faster).
-        output_config={"effort": "medium"},
-        # If a safety check declines the request, Anthropic retries on a suitable model
-        # inside the same call instead of failing. Recommended default for this model.
+        output_config={"effort": effort},
+        # Some safety-check declines (on this model: the "cyber" and "frontier_llm"
+        # categories) are retried on a suitable model inside the same call. Other declines
+        # still come back as stop_reason "refusal", which to_answer handles.
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
     )
     return to_answer(response, hits)
 
 
-def to_answer(response: Any, hits: list[Hit]) -> Answer:
+def to_answer(response: BetaMessage, hits: list[Hit]) -> Answer:
     """Turn Claude's response into an Answer with numbered citations.
 
     Kept separate from answer() so tests can feed it a recorded response, no API call.
@@ -108,56 +126,83 @@ def to_answer(response: Any, hits: list[Hit]) -> Answer:
         raise AnswerError("The answer was cut off (max_tokens reached).")
     refused = response.stop_reason == "refusal"
 
-    numbers: dict[int, int] = {}  # search result position -> [number] shown to the user
-    citations: list[Citation] = []
-    parts: list[str] = []
-    for block in response.content:
-        if block.type != "text":
-            continue  # skip thinking and other non-answer blocks
-        parts.append(block.text)
-        for cite in block.citations or []:
-            if cite.type != "search_result_location":
-                continue
-            if cite.search_result_index not in numbers:
-                numbers[cite.search_result_index] = len(numbers) + 1
-                hit = hits[cite.search_result_index]
-                citations.append(
-                    Citation(
-                        number=numbers[cite.search_result_index],
-                        ref=hit.chunk.ref,
-                        url=hit.chunk.url,  # our own link, never a URL taken from model text
-                        cited_text=cite.cited_text,
-                    )
-                )
-            parts.append(f" [{numbers[cite.search_result_index]}]")
-
-    text = "".join(parts).strip()
-    if refused and not text:
-        text = "Claude declined to answer this question."
+    text, citations = ("", []) if refused else _text_with_citations(response, hits)
+    if refused:
+        # A safety check can stop Claude partway through. Anthropic's guidance: throw the
+        # partial text away instead of showing an unfinished answer.
+        category = response.stop_details.category if response.stop_details else None
+        text = f"{DECLINED} (category: {category})" if category else DECLINED
 
     usage = response.usage
-    input_tokens = (
-        usage.input_tokens
-        + (usage.cache_creation_input_tokens or 0)
-        + (usage.cache_read_input_tokens or 0)
-    )
+    cache_write = usage.cache_creation_input_tokens or 0
+    cache_read = usage.cache_read_input_tokens or 0
     return Answer(
         text=text,
         citations=citations,
         model=response.model,
-        input_tokens=input_tokens,
+        input_tokens=usage.input_tokens + cache_write + cache_read,
         output_tokens=usage.output_tokens,
-        cost_usd=cost_usd(response.model, input_tokens, usage.output_tokens),
+        cost_usd=cost_usd(
+            response.model, usage.input_tokens, usage.output_tokens, cache_write, cache_read
+        ),
         refused=refused,
     )
 
 
-def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float | None:
+def _text_with_citations(response: BetaMessage, hits: list[Hit]) -> tuple[str, list[Citation]]:
+    """Join the answer pieces, adding a [number] marker after each piece that uses a source.
+
+    Sources are numbered by citation ref, so two chunks of the same recital (e.g. a long
+    recital split by sentences) share one number and one line in the source list.
+    """
+    numbers: dict[str, int] = {}  # ref -> [number] shown to the user
+    urls: dict[str, str] = {}
+    quotes: dict[str, list[str]] = {}
+    parts: list[str] = []
+    for block in response.content:
+        if block.type != "text":
+            continue  # skip thinking, fallback and other non-answer blocks
+        parts.append(block.text)
+        markers: list[int] = []  # markers for this piece, without repeats
+        for cite in block.citations or []:
+            if cite.type != "search_result_location":
+                continue
+            chunk = hits[cite.search_result_index].chunk
+            if chunk.ref not in numbers:
+                numbers[chunk.ref] = len(numbers) + 1
+                urls[chunk.ref] = chunk.url  # our own link, never a URL taken from model text
+                quotes[chunk.ref] = []
+            if cite.cited_text not in quotes[chunk.ref]:
+                quotes[chunk.ref].append(cite.cited_text)
+            if numbers[chunk.ref] not in markers:
+                markers.append(numbers[chunk.ref])
+        parts.extend(f" [{n}]" for n in markers)
+
+    citations = [
+        Citation(number=n, ref=ref, url=urls[ref], quotes=tuple(quotes[ref]))
+        for ref, n in numbers.items()
+    ]
+    return "".join(parts).strip(), citations
+
+
+def cost_usd(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_write_tokens: int = 0,
+    cache_read_tokens: int = 0,
+) -> float | None:
     """What a request cost at list prices, or None for a model we have no price for."""
     if model not in PRICES_PER_MILLION:
         return None
     input_price, output_price = PRICES_PER_MILLION[model]
-    return (input_tokens * input_price + output_tokens * output_price) / 1_000_000
+    total = (
+        input_tokens * input_price
+        + cache_write_tokens * input_price * CACHE_WRITE_FACTOR
+        + cache_read_tokens * input_price * CACHE_READ_FACTOR
+        + output_tokens * output_price
+    )
+    return total / 1_000_000
 
 
 def main() -> None:
@@ -169,9 +214,9 @@ def main() -> None:
     from ai_act_navigator.search import search
     from ai_act_navigator.store import VectorStore
 
-    if len(sys.argv) < 2:
+    question = " ".join(sys.argv[1:]).strip()
+    if not question:
         sys.exit('Usage: uv run python -m ai_act_navigator.answer "your question"')
-    question = " ".join(sys.argv[1:])
 
     # Reads ANTHROPIC_API_KEY from the git-ignored .env file into the environment, where
     # the Anthropic client finds it. The key is never printed or logged.

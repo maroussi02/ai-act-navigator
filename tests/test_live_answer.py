@@ -1,6 +1,6 @@
 """PAID SMOKE TEST: one real question to Claude (about $0.01). Never runs in CI.
 
-Run it by hand:  uv run pytest -m paid
+Run it by hand:  uv run pytest --run-paid -m paid
 Needs ANTHROPIC_API_KEY in .env and a built index (uv run python -m ai_act_navigator.index).
 """
 

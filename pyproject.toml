@@ -31,10 +31,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 markers = [
     "integration: needs real data or the real model (slower)",
-    "paid: calls the Claude API and costs money; run by hand with: uv run pytest -m paid",
+    "paid: calls the Claude API and costs money; only runs with --run-paid (see tests/conftest.py)",
 ]
-# Paid tests never run unless asked for explicitly (CI included).
-addopts = "-m 'not paid'"
 
 [dependency-groups]
 dev = [

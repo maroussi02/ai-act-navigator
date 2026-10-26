@@ -76,9 +76,14 @@ class VectorStore:
     def search(self, query_embedding: list[float], k: int = 5) -> list[Hit]:
         """The k chunks closest in meaning to the query, best first."""
         built_with = (self._collection.metadata or {}).get("embedding_model")
-        if built_with is None:
+        if self.count() == 0:
             raise IndexMismatchError(
                 "The index is empty. Build it with: uv run python -m ai_act_navigator.index"
+            )
+        if built_with is None:
+            raise IndexMismatchError(
+                "The index was built by an older version that didn't record its model. "
+                "Rebuild it: uv run python -m ai_act_navigator.index"
             )
         if built_with != self.embedding_model:
             raise IndexMismatchError(
