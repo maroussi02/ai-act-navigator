@@ -53,13 +53,14 @@ jobs:
       - name: Run tests (unit + integration)
         run: uv run pytest
 
-      # Smoke test: run the real command like a user would and check it produced output.
-      # Catches "all tests green but the program crashes" (e.g. a broken main()).
-      - name: Smoke test - chunking command
-        run: |
-          uv run python -m ai_act_navigator.chunk
-          test -s data/chunks.jsonl || { echo "data/chunks.jsonl is missing or empty"; exit 1; }
+      # Smoke tests: run the real commands like a user would and check they produce output.
+      # Catches "all tests green but the program crashes" (e.g. a broken entry point).
+      - name: Smoke test - ai-act --help
+        run: uv run ai-act --help
 
-      - name: Smoke test - index command
+      - name: Smoke test - ai-act index
         # Must index chunks, and none may be cut off by the model's 512-token limit.
-        run: uv run python -m ai_act_navigator.index | tee index.log && grep -qE "Indexed [0-9]+ chunks .*\(0 truncated" index.log
+        run: |
+          uv run ai-act index | tee index.log
+          test -s data/chunks.jsonl
+          grep -qE "Indexed [0-9]+ chunks .*\(0 truncated" index.log

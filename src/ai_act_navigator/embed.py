@@ -5,8 +5,8 @@ Texts with similar meaning get similar numbers, even if they use different words
 interacting with an AI system..."), which is what makes search by meaning possible.
 
 The model runs locally on your machine. The first run downloads it once (about 130 MB)
-from Hugging Face into ~/.cache/huggingface. After that, no internet is needed and no
-text ever leaves your computer.
+from Hugging Face into ~/.cache/huggingface. After that it loads from that folder without
+contacting Hugging Face, and no text ever leaves your computer.
 """
 
 from sentence_transformers import SentenceTransformer
@@ -24,6 +24,23 @@ MODEL_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
 
+def load_model(model_name: str, revision: str) -> SentenceTransformer:
+    """Load the model from the local cache, and download it only if it isn't there yet.
+
+    Without local_files_only, the library checks Hugging Face for updates on every start,
+    which took over a minute without internet. The pinned revision never changes, so the
+    cached copy is always the right one.
+    """
+    # trust_remote_code=False (the default) means we never run code shipped with the
+    # model, we only load its weights. Kept explicit here for security.
+    try:
+        return SentenceTransformer(
+            model_name, revision=revision, trust_remote_code=False, local_files_only=True
+        )
+    except OSError:  # not in the cache yet: first run
+        return SentenceTransformer(model_name, revision=revision, trust_remote_code=False)
+
+
 class Embedder:
     """Wraps the embedding model so the rest of the code doesn't depend on the library.
 
@@ -35,9 +52,7 @@ class Embedder:
         # e.g. "BAAI/bge-small-en-v1.5@5c38ec7...". The index records it, so search can
         # refuse to compare vectors made by two different models (they'd be meaningless).
         self.model_id = f"{model_name}@{revision}"
-        # trust_remote_code=False (the default) means we never run code shipped with the
-        # model, we only load its weights. Kept explicit here for security.
-        self._model = SentenceTransformer(model_name, revision=revision, trust_remote_code=False)
+        self._model = load_model(model_name, revision)
 
     @property
     def max_tokens(self) -> int:
