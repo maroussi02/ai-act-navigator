@@ -21,3 +21,14 @@ class Chunk:
     title: str  # article or annex title, empty for recitals
     text: str
     url: str  # link to the exact spot in the official text
+
+
+@dataclass(frozen=True)
+class Hit:
+    """One search result: a chunk and how close it is to the question.
+
+    score is the cosine similarity: 1.0 = same meaning, 0.0 = unrelated.
+    """
+
+    chunk: Chunk
+    score: float
