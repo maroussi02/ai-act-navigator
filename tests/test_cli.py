@@ -6,6 +6,7 @@
 
 import dataclasses
 import json
+from types import SimpleNamespace
 
 import anthropic
 import httpx
@@ -67,9 +68,9 @@ def test_options_are_passed_to_the_pipeline(fake_pipeline):
     }
 
 
-def test_search_is_hybrid_by_default(fake_pipeline):
+def test_search_reranks_by_default(fake_pipeline):
     cli.main(["ask", "q"])
-    assert fake_pipeline["search_mode"] == "hybrid"
+    assert fake_pipeline["search_mode"] == "rerank"
 
 
 def test_quotes_option_shows_every_quote(fake_pipeline, capsys):
@@ -197,7 +198,8 @@ def test_results_file_records_what_is_needed_to_rerun_the_score(fake_eval, tmp_p
 
     settings = json.loads(out.read_text())["settings"]
     assert settings["effort"] == "low"
-    assert settings["search"] == "hybrid"
+    assert settings["search"] == "rerank"
+    assert settings["reranker_model"].startswith("cross-encoder/ms-marco-MiniLM-L6-v2@")
     assert settings["prompt_version"] == PROMPT_VERSION
     assert settings["prompt_sha256"] == PROMPT_SHA256
     assert settings["embedding_model"].startswith("BAAI/bge-small-en-v1.5@")
@@ -270,7 +272,7 @@ class FakeSearcher:
 
 def test_search_only_checks_search_without_claude_or_api_key(fake_eval, monkeypatch, capsys):
     searcher = FakeSearcher()
-    monkeypatch.setattr(cli, "make_searcher", lambda: searcher)
+    monkeypatch.setattr(cli, "make_searcher", lambda mode: searcher)
 
     def no_key():
         raise AssertionError("--search-only must not need the API key")
@@ -289,6 +291,30 @@ def test_search_only_checks_search_without_claude_or_api_key(fake_eval, monkeypa
 
 
 def test_search_only_refuses_out(fake_eval, monkeypatch, capsys, tmp_path):
-    monkeypatch.setattr(cli, "make_searcher", FakeSearcher)
+    monkeypatch.setattr(cli, "make_searcher", lambda mode: FakeSearcher())
     assert cli.main(["eval", "--search-only", "--out", str(tmp_path / "x.json")]) == 1
     assert "--search-only writes no results file" in capsys.readouterr().err
+
+
+def test_only_rerank_mode_loads_the_reranker(monkeypatch):
+    """make_searcher must not spend time loading a model the chosen mode won't use."""
+    from ai_act_navigator import embed, rerank, store
+
+    loaded = []
+
+    class FakeStore:
+        def __init__(self, model_id):
+            pass
+
+        def all_chunks(self):
+            return []
+
+    monkeypatch.setattr(embed, "Embedder", lambda allow_download: SimpleNamespace(model_id="m"))
+    monkeypatch.setattr(store, "VectorStore", FakeStore)
+    monkeypatch.setattr(rerank, "Reranker", lambda allow_download: loaded.append(allow_download))
+
+    cli.make_searcher("hybrid")
+    cli.make_searcher("vector")
+    assert loaded == []
+    cli.make_searcher("rerank")
+    assert loaded == [False]  # offline: asking never downloads

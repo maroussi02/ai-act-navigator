@@ -33,13 +33,15 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      # Keep the embedding model (~130 MB) between runs instead of downloading it every time.
-      - name: Cache the embedding model
+      # Keep the local models (embedding ~130 MB, reranker ~90 MB) between runs instead of
+      # downloading them every time.
+      - name: Cache the local models
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/huggingface
-          # Tied to embed.py: changing the model or its pinned revision starts a fresh cache.
-          key: hf-${{ runner.os }}-${{ hashFiles('src/ai_act_navigator/embed.py') }}
+          # Tied to the files that pin the models: changing a model or its pinned revision
+          # starts a fresh cache.
+          key: hf-${{ runner.os }}-${{ hashFiles('src/ai_act_navigator/embed.py', 'src/ai_act_navigator/rerank.py') }}
 
       - name: Lint
         run: uv run ruff check .

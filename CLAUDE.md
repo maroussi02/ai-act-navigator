@@ -19,8 +19,8 @@ uv run ruff check . && uv run ruff format .
 
 ## Layout
 - `src/ai_act_navigator/`: one module per pipeline step: `download` → `chunk` → `embed` /
-  `store` / `index` → `search` (+ `keyword` for BM25, `refs` for article references) →
-  `answer`; `cli.py` is the `ai-act` command; `golden.py` + `evaluate.py` run the golden set
+  `store` / `index` → `search` (+ `keyword` for BM25, `refs` for article references,
+  `rerank` for the reranker) → `answer`; `cli.py` is the `ai-act` command; `golden.py` + `evaluate.py` run the golden set
   (`evals/golden-v1.json`); `prompts.toml` holds the versioned prompt, loaded by `prompts.py`.
 - `tests/`: each file starts with its type (UNIT / INTEGRATION TESTS ...).
 - `docs/hand-check-v1.md`: the manual check of 10 answers (owner's verdicts).
@@ -40,7 +40,7 @@ uv run ruff check . && uv run ruff format .
 
 ## Security
 - Never commit, read or print `.env` (holds `ANTHROPIC_API_KEY`). Pre-commit runs gitleaks.
-- Pin versions: the law's download by SHA-256, the embedding model by git revision, GitHub
-  Actions by commit hash. Keep `trust_remote_code=False`.
+- Pin versions: the law's download by SHA-256, the embedding model and the reranker by git
+  revision, GitHub Actions by commit hash. Keep `trust_remote_code=False`.
 - CI token stays read-only. Prompts treat retrieved text as source material, never as
   instructions.

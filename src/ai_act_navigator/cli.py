@@ -52,6 +52,7 @@ from ai_act_navigator.golden import (
 from ai_act_navigator.models import Hit
 from ai_act_navigator.paths import PROJECT_ROOT
 from ai_act_navigator.prompts import PROMPT_SHA256, PROMPT_VERSION
+from ai_act_navigator.rerank import RERANK_MODEL, RERANK_REVISION
 from ai_act_navigator.search import DEFAULT_K, DEFAULT_MODE, Searcher
 from ai_act_navigator.store import IndexMismatchError
 
@@ -59,6 +60,9 @@ from ai_act_navigator.store import IndexMismatchError
 # of input per question with Sonnet. Without a limit, a typo like --k 900 would send almost
 # the whole law (~140,000 tokens, ~$0.30) with every question.
 MAX_K = 50
+
+
+RERANKER_ID = f"{RERANK_MODEL}@{RERANK_REVISION}"  # recorded in eval results
 
 
 class UserError(Exception):
@@ -117,8 +121,9 @@ def add_pipeline_options(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--search",
         default=DEFAULT_MODE,
-        choices=["hybrid", "vector"],
-        help="hybrid = meaning + keywords + named articles; vector = meaning only, as in v1 "
+        choices=["rerank", "hybrid", "vector"],
+        help="rerank = hybrid + a reranker that puts the best paragraph first; hybrid = "
+        "meaning + keywords + named articles; vector = meaning only, as in v1 "
         f"(default {DEFAULT_MODE})",
     )
     command.add_argument("--model", default=MODEL, help=f"Claude model (default {MODEL})")
@@ -201,19 +206,22 @@ def ask_question(question: str, k: int, search_mode: str, model: str, effort: st
     return result
 
 
-def make_searcher() -> Searcher:
-    """Load the embedding model and the index once, ready to search.
+def make_searcher(search_mode: str) -> Searcher:
+    """Load the models and the index once, ready to search.
 
-    The model is imported inside the function because loading it and its libraries takes a
-    few seconds; `ai-act --help` shouldn't have to wait for that.
+    The reranker is loaded only for search mode "rerank". The models are imported inside
+    the function because loading them and their libraries takes a few seconds;
+    `ai-act --help` shouldn't have to wait for that.
     """
     from ai_act_navigator.embed import Embedder
+    from ai_act_navigator.rerank import Reranker
     from ai_act_navigator.store import VectorStore
 
-    # allow_download=False: searching never contacts Hugging Face. If the model is missing,
-    # the error says to run `ai-act index`, which downloads it.
+    # allow_download=False: searching never contacts Hugging Face. If a model is missing,
+    # the error says to run `ai-act index`, which downloads both.
     embedder = Embedder(allow_download=False)
-    return Searcher(embedder, VectorStore(embedder.model_id))
+    reranker = Reranker(allow_download=False) if search_mode == "rerank" else None
+    return Searcher(embedder, VectorStore(embedder.model_id), reranker)
 
 
 def make_asker(k: int, search_mode: str, model: str, effort: str) -> Ask:
@@ -224,7 +232,7 @@ def make_asker(k: int, search_mode: str, model: str, effort: str) -> Ask:
     """
     from ai_act_navigator.answer import answer
 
-    searcher = make_searcher()
+    searcher = make_searcher(search_mode)
     client = anthropic.Anthropic()
 
     def ask(question: str) -> tuple[list[Hit], Answer]:
@@ -266,6 +274,7 @@ def run_eval(args: argparse.Namespace) -> int:
         "effort": args.effort,
         "k": args.k,
         "search": args.search,
+        "reranker_model": RERANKER_ID if args.search == "rerank" else None,
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": PROMPT_SHA256,  # the exact prompt text this run used
     }
@@ -302,7 +311,7 @@ def run_search_only(questions: list[GoldenQuestion], k: int, search_mode: str) -
     full eval.
     """
     in_scope = [q for q in questions if q.type != "out_of_scope"]
-    searcher = make_searcher()
+    searcher = make_searcher(search_mode)
     print(f"Search only, no Claude calls ({len(in_scope)} questions, search {search_mode}, k {k})")
     found = 0
     for question in in_scope:
