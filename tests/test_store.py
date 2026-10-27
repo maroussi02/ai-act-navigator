@@ -1,5 +1,8 @@
 """UNIT TESTS for store.py: real Chroma in a temporary folder, tiny hand-made vectors."""
 
+import math
+import random
+
 import pytest
 
 from ai_act_navigator.models import Chunk
@@ -68,3 +71,33 @@ def test_index_from_an_older_version_asks_for_a_rebuild(tmp_path):
     )
     with pytest.raises(IndexMismatchError, match="older version"):
         store.search([1.0, 0.0])
+
+
+def test_search_is_exact_on_many_vectors(tmp_path):
+    """Chroma's own (approximate) index could skip chunks; our search must not."""
+    rng = random.Random(0)  # fixed seed: the same "random" vectors on every run
+    vectors = [[rng.uniform(-1, 1) for _ in range(8)] for _ in range(300)]
+    chunks = [Chunk(f"c-{i:03}", "recital", f"Recital {i}", "", "t", URL) for i in range(300)]
+    store = VectorStore("model-a", tmp_path)
+    store.upsert(chunks, vectors)
+    query = [rng.uniform(-1, 1) for _ in range(8)]
+
+    def cosine(a, b):
+        dot = sum(x * y for x, y in zip(a, b, strict=True))
+        return dot / math.sqrt(sum(x * x for x in a) * sum(y * y for y in b))
+
+    expected = sorted(range(300), key=lambda i: -cosine(query, vectors[i]))[:10]
+    assert [h.chunk.id for h in store.search(query, k=10)] == [chunks[i].id for i in expected]
+
+
+def test_equal_scores_are_ordered_by_id(tmp_path):
+    twins = [Chunk(i, "recital", f"Recital {n}", "", "t", URL) for n, i in [(2, "b"), (1, "a")]]
+    store = VectorStore("model-a", tmp_path)
+    store.upsert(twins, [[1.0, 0.0], [1.0, 0.0]])
+    assert [h.chunk.id for h in store.search([1.0, 0.0], k=2)] == ["a", "b"]
+
+
+def test_search_sees_new_vectors_after_upsert(store):
+    assert store.search([1.0, 0.0], k=1)[0].chunk.id == "art-50-1"
+    store.upsert(CHUNKS, [[0.0, 1.0], [1.0, 0.0]])  # swap the two vectors
+    assert store.search([1.0, 0.0], k=1)[0].chunk.id == "art-5-1"

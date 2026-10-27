@@ -4,8 +4,16 @@ It wraps Chroma, a vector database that runs as a library and saves everything a
 files in a folder (data/chroma/): no account, no server. Only this file knows about Chroma.
 The rest of the code talks to VectorStore, so swapping Chroma for another database later
 (or for LangChain's vector store wrapper) means changing this one file.
+
+Chroma stores the chunks and vectors, but search doesn't use Chroma's own index. That index
+(HNSW) is *approximate*: it trades a little accuracy for speed on millions of vectors, and on
+this law it sometimes skipped a chunk (Recital 119 for the chatbot question was missing in
+2 of 4 runs with the exact same question vector). With only about 950 chunks, comparing the
+question with every vector is exact, gives the same result on every run, and is fast enough:
+about 8 ms per search in plain Python (measured on an Apple M5), after a one-time 65 ms load.
 """
 
+import math
 from pathlib import Path
 
 import chromadb
@@ -40,10 +48,14 @@ class VectorStore:
         self._collection = client.get_or_create_collection(
             COLLECTION_NAME,
             # "cosine": closeness = the angle between two vectors, the standard for text.
+            # (Chroma always builds this index; our search doesn't use it, see the top.)
             configuration={"hnsw": {"space": "cosine"}},
             # We always pass our own embeddings, so Chroma never needs its built-in model.
             embedding_function=None,
         )
+        # Every chunk with its vector scaled to length 1, read from Chroma on first use.
+        # None = not read yet, or out of date after upsert.
+        self._rows: list[tuple[Chunk, list[float]]] | None = None
 
     def count(self) -> int:
         """How many chunks are stored."""
@@ -72,32 +84,47 @@ class VectorStore:
         if stale_ids:
             self._collection.delete(ids=stale_ids)
         self._collection.modify(metadata={"embedding_model": self.embedding_model})
+        self._rows = None  # the in-memory copy is out of date now
 
     def search(self, query_embedding: list[float], k: int = 5) -> list[Hit]:
-        """The k chunks closest in meaning to the query, best first."""
-        self._check_ready()
-        result = self._collection.query(query_embeddings=[query_embedding], n_results=k)
-        # Chroma answers for a list of queries; we sent one, so we take element [0] of each.
-        rows = zip(
-            result["ids"][0],
-            result["documents"][0],
-            result["metadatas"][0],
-            result["distances"][0],
-            strict=True,
-        )
-        return [
-            # cosine distance -> similarity (1.0 = same meaning)
-            Hit(chunk=_to_chunk(chunk_id, text, meta), score=1.0 - distance)
-            for chunk_id, text, meta, distance in rows
-        ]
+        """The k chunks closest in meaning to the query, best first. Exact: every stored
+        vector is compared, so the best chunks can't be skipped (see the top of this file).
+
+        Closeness is the cosine similarity: 1.0 = same direction (same meaning), 0.0 =
+        unrelated. Equal scores are ordered by chunk id, so results never vary between runs.
+        """
+        query = _unit(query_embedding)
+        scored = [(_dot(query, vector), chunk) for chunk, vector in self._load()]
+        best = sorted(scored, key=lambda pair: (-pair[0], pair[1].id))[:k]
+        return [Hit(chunk=chunk, score=similarity) for similarity, chunk in best]
 
     def all_chunks(self) -> list[Chunk]:
-        """Every stored chunk, in no particular order. Keyword search is built from these,
-        so it always searches exactly the chunks the vector index holds."""
+        """Every stored chunk, ordered by id. Keyword search is built from these, so it always
+        searches exactly the chunks the vector search holds, in the same order every run."""
+        return [chunk for chunk, _ in self._load()]
+
+    def _load(self) -> list[tuple[Chunk, list[float]]]:
+        """All chunks with their vectors (length 1), read from Chroma once, ordered by id."""
         self._check_ready()
-        result = self._collection.get(include=["documents", "metadatas"])
-        rows = zip(result["ids"], result["documents"], result["metadatas"], strict=True)
-        return [_to_chunk(chunk_id, text, meta) for chunk_id, text, meta in rows]
+        if self._rows is None:
+            result = self._collection.get(include=["embeddings", "documents", "metadatas"])
+            rows = zip(
+                result["ids"],
+                result["embeddings"],
+                result["documents"],
+                result["metadatas"],
+                strict=True,
+            )
+            self._rows = sorted(
+                # Chroma returns each vector as a numpy array; plain Python floats keep the
+                # math below simple to read.
+                (
+                    (_to_chunk(i, text, meta), _unit([float(x) for x in vector]))
+                    for i, vector, text, meta in rows
+                ),
+                key=lambda row: row[0].id,
+            )
+        return self._rows
 
     def _check_ready(self) -> None:
         """Raise IndexMismatchError unless the index is built, with the model searching it."""
@@ -126,3 +153,18 @@ def _to_chunk(chunk_id: str, text: str, meta: dict) -> Chunk:
         text=text,
         url=meta["url"],
     )
+
+
+def _unit(vector: list[float]) -> list[float]:
+    """The vector scaled to length 1, so the cosine similarity is a plain dot product.
+
+    The real embedder already returns length-1 vectors; this keeps search correct for any
+    vector (e.g. in tests). An all-zero vector stays all zeros: similarity 0 with everything.
+    """
+    length = math.sqrt(sum(x * x for x in vector))
+    return [x / length for x in vector] if length else vector
+
+
+def _dot(a: list[float], b: list[float]) -> float:
+    """Sum of a[i] * b[i]: for two length-1 vectors, their cosine similarity."""
+    return sum(x * y for x, y in zip(a, b, strict=True))
