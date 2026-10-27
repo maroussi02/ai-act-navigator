@@ -11,10 +11,13 @@ no network requests to Hugging Face at all.
 """
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:  # only for type hints; the real import happens inside load_model
-    from sentence_transformers import SentenceTransformer
+    from sentence_transformers import CrossEncoder, SentenceTransformer
+
+# Which kind of model to load: an embedding model (embed.py) or a reranker (rerank.py).
+ModelKind = Literal["embedding", "reranker"]
 
 # Small, fast, good-quality English model. Swap it here to try another one.
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
@@ -30,11 +33,16 @@ QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
 
 class ModelNotAvailableError(Exception):
-    """The embedding model is not on this computer and could not be downloaded."""
+    """A local model (embedding or reranker) is not on this computer and couldn't be downloaded."""
 
 
-def load_model(model_name: str, revision: str, allow_download: bool) -> "SentenceTransformer":
+def load_model(
+    model_name: str, revision: str, allow_download: bool, kind: ModelKind = "embedding"
+) -> "SentenceTransformer | CrossEncoder":
     """Load the model from the local cache; download it only if allowed and not there yet.
+
+    Used for both local models, so the offline rules below live in one place: the embedding
+    model (a SentenceTransformer) and the reranker (a CrossEncoder, see rerank.py).
 
     allow_download=False is full offline mode: no network requests to Hugging Face at all.
     local_files_only alone isn't enough, because the library still makes small requests of
@@ -50,24 +58,25 @@ def load_model(model_name: str, revision: str, allow_download: bool) -> "Sentenc
     """
     if not allow_download:
         os.environ["HF_HUB_OFFLINE"] = "1"
-    from sentence_transformers import SentenceTransformer
+    from sentence_transformers import CrossEncoder, SentenceTransformer
 
+    model_class = SentenceTransformer if kind == "embedding" else CrossEncoder
     # trust_remote_code=False (the default) means we never run code shipped with the
     # model, we only load its weights. Kept explicit here for security.
     try:
-        return SentenceTransformer(
+        return model_class(
             model_name, revision=revision, trust_remote_code=False, local_files_only=True
         )
     except OSError as error:  # not in the cache yet
         if not allow_download:
             raise ModelNotAvailableError(
-                "The embedding model isn't downloaded yet. Run: uv run ai-act index"
+                f"The {kind} model isn't downloaded yet. Run: uv run ai-act index"
             ) from error
     try:
-        return SentenceTransformer(model_name, revision=revision, trust_remote_code=False)
+        return model_class(model_name, revision=revision, trust_remote_code=False)
     except OSError as error:  # e.g. no internet
         raise ModelNotAvailableError(
-            f"Could not download the embedding model {model_name} from Hugging Face. "
+            f"Could not download the {kind} model {model_name} from Hugging Face. "
             "Check your internet connection."
         ) from error
 

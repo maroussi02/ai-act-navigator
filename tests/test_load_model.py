@@ -32,8 +32,13 @@ def fake_library(monkeypatch):
         return "cached model" if local_files_only else "downloaded model"
 
     # load_model imports the library itself, so the fake goes where `import` looks first.
+    def fake_cross_encoder(*args, **kwargs):
+        return "reranker: " + fake_model(*args, **kwargs)
+
     monkeypatch.setitem(
-        sys.modules, "sentence_transformers", SimpleNamespace(SentenceTransformer=fake_model)
+        sys.modules,
+        "sentence_transformers",
+        SimpleNamespace(SentenceTransformer=fake_model, CrossEncoder=fake_cross_encoder),
     )
     # load_model may set HF_HUB_OFFLINE; monkeypatch puts the original value back afterwards.
     monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
@@ -71,3 +76,14 @@ def test_failed_download_is_a_clear_error(fake_library):
     fails.update(cache=True, download=True)
     with pytest.raises(ModelNotAvailableError, match="Check your internet connection"):
         embed.load_model("some/model", "abc", allow_download=True)
+
+
+def test_a_reranker_loads_with_the_same_offline_rules(fake_library):
+    calls, fails = fake_library
+    fails["cache"] = True
+    with pytest.raises(ModelNotAvailableError, match="reranker model isn't downloaded"):
+        embed.load_model("some/reranker", "abc", allow_download=False, kind="reranker")
+    fails["cache"] = False
+    assert embed.load_model("some/reranker", "abc", True, kind="reranker") == (
+        "reranker: cached model"
+    )

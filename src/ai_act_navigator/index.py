@@ -39,8 +39,11 @@ def build_index(chunks: list[Chunk], embedder: DocumentEmbedder, store: VectorSt
 
 
 def main() -> None:
-    """Chunk the law, embed the chunks and store them."""
-    from ai_act_navigator.embed import Embedder  # imported here: loading the model is slow
+    """Chunk the law, embed the chunks and store them. Also download the reranker, so
+    `ai-act ask` finds both local models and never needs to contact Hugging Face."""
+    # Imported here: loading the models is slow.
+    from ai_act_navigator.embed import Embedder
+    from ai_act_navigator.rerank import Reranker
 
     # Always re-chunk (takes about a second), so the index never uses an outdated
     # chunks.jsonl written by an older version of the chunking rules.
@@ -52,6 +55,7 @@ def main() -> None:
     truncated = embedder.count_truncated([text_to_embed(c) for c in chunks])
     store = VectorStore(embedder.model_id)
     build_index(chunks, embedder, store)
+    Reranker()  # downloads it once if it isn't in the cache yet
     seconds = time.perf_counter() - start
 
     print(
