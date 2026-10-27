@@ -43,7 +43,7 @@ from ai_act_navigator.evaluate import (
 from ai_act_navigator.golden import GOLDEN_PATH, GoldenSetError, check_mix, load_golden
 from ai_act_navigator.models import Hit
 from ai_act_navigator.paths import PROJECT_ROOT
-from ai_act_navigator.prompts import PROMPT_VERSION
+from ai_act_navigator.prompts import PROMPT_SHA256, PROMPT_VERSION
 from ai_act_navigator.search import DEFAULT_K
 from ai_act_navigator.store import IndexMismatchError
 
@@ -231,6 +231,7 @@ def run_eval(args: argparse.Namespace) -> int:
         "effort": args.effort,
         "k": args.k,
         "prompt_version": PROMPT_VERSION,
+        "prompt_sha256": PROMPT_SHA256,  # the exact prompt text this run used
     }
     print(f"Asking {len(questions)} questions ({args.model}, effort {args.effort}, k {args.k})")
     results = []
