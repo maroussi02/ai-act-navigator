@@ -164,7 +164,7 @@
       "question": "Which AI law applies to our product in the United States?",
       "answer": "Not in the AI Act. It does not mention US law. (It does reach providers outside the EU whose AI output is used in the EU, Art. 2(1)(c), but that says nothing about US rules.)",
       "sources": [],
-      "checked": false
+      "checked": true
     },
     {
       "id": "O5",
