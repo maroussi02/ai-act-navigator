@@ -13,6 +13,7 @@ Three question types:
 
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, get_args
@@ -63,7 +64,10 @@ def article_of(ref: str) -> str:
 
 def load_golden(path: Path = GOLDEN_PATH) -> list[GoldenQuestion]:
     """Read and check the golden set. Raises GoldenSetError if a rule is broken."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise GoldenSetError(f"{path.name} is not valid JSON: {error}") from error
     questions = [_to_question(entry) for entry in data["questions"]]
 
     ids = [q.id for q in questions]
@@ -79,6 +83,11 @@ def _to_question(entry: dict) -> GoldenQuestion:
     except (TypeError, KeyError) as error:  # missing or unknown field
         raise GoldenSetError(f"{entry.get('id', '?')}: {error}") from error
 
+    # JSON has no types of its own: "checked": "no" would otherwise count as checked.
+    if not isinstance(question.checked, bool):
+        raise GoldenSetError(f"{question.id}: checked must be true or false")
+    if not question.question.strip():
+        raise GoldenSetError(f"{question.id}: question is empty")
     if question.type not in get_args(QuestionType):
         raise GoldenSetError(f"{question.id}: unknown type {question.type!r}")
     if question.type == "out_of_scope" and question.sources:
@@ -92,3 +101,14 @@ def _to_question(entry: dict) -> GoldenQuestion:
                 'e.g. "Art. 50" or "Annex III"'
             )
     return question
+
+
+def check_mix(questions: list[GoldenQuestion]) -> None:
+    """Raise GoldenSetError unless there are at least MIN_PER_TYPE questions of each type.
+
+    Checked before an eval run, not in load_golden, so tests can load small example files.
+    """
+    counts = Counter(q.type for q in questions)
+    short = [f"{t} {counts[t]}/{n}" for t, n in MIN_PER_TYPE.items() if counts[t] < n]
+    if short:
+        raise GoldenSetError(f"Too few questions of a type: {', '.join(short)}")

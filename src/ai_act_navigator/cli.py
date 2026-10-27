@@ -26,16 +26,21 @@ import anthropic
 import httpx
 
 from ai_act_navigator.answer import EFFORT, MODEL, Answer, AnswerError
+from ai_act_navigator.chunk import OUTPUT_PATH as CHUNKS_PATH
 from ai_act_navigator.download import IntegrityError
+from ai_act_navigator.embed import MODEL_NAME as EMBED_MODEL
+from ai_act_navigator.embed import MODEL_REVISION as EMBED_REVISION
 from ai_act_navigator.embed import ModelNotAvailableError
 from ai_act_navigator.evaluate import (
     RESULTS_DIR,
     Ask,
     QuestionResult,
     evaluate_one,
+    file_sha256,
+    git_commit,
     save_results,
 )
-from ai_act_navigator.golden import GOLDEN_PATH, load_golden
+from ai_act_navigator.golden import GOLDEN_PATH, GoldenSetError, check_mix, load_golden
 from ai_act_navigator.models import Hit
 from ai_act_navigator.paths import PROJECT_ROOT
 from ai_act_navigator.prompts import PROMPT_VERSION
@@ -121,7 +126,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.handler(args)
-    except (UserError, IndexMismatchError, AnswerError, ModelNotAvailableError) as error:
+    except (
+        UserError,
+        IndexMismatchError,
+        AnswerError,
+        ModelNotAvailableError,
+        GoldenSetError,
+    ) as error:
         return fail(str(error))
     except anthropic.AuthenticationError:
         return fail("The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in .env.")
@@ -197,28 +208,47 @@ def run_eval(args: argparse.Namespace) -> int:
     unchecked = [q.id for q in questions if not q.checked]
     if unchecked:  # a score on unchecked answers would be a guess, not a baseline
         raise UserError(f"Golden set not checked by hand yet: {', '.join(unchecked)}")
+    check_mix(questions)
+
+    started = datetime.now(UTC)
+    path = args.out or RESULTS_DIR / (
+        f"{started:%Y-%m-%d-%H%M%S}-{args.model}-{args.effort}-k{args.k}.json"
+    )
+    if path.exists():  # e.g. --out pointing at the committed baseline
+        raise UserError(f"{path} already exists. Choose another --out or delete it first.")
 
     load_api_key()
-    started = datetime.now(UTC)
     ask = make_asker(args.k, args.model, args.effort)
-    print(f"Asking {len(questions)} questions ({args.model}, effort {args.effort}, k {args.k})")
-    results = []
-    for question in questions:
-        result = evaluate_one(question, ask)
-        print(format_result_line(result))
-        results.append(result)
-
-    path = args.out or RESULTS_DIR / (
-        f"{started:%Y-%m-%d-%H%M}-{args.model}-{args.effort}-k{args.k}.json"
-    )
+    # Everything needed to rerun this exact score later: code, data, models, settings.
     settings = {
         "date": started.isoformat(timespec="seconds"),
+        "git_commit": git_commit(),
         "golden_set": GOLDEN_PATH.name,
+        "golden_set_sha256": file_sha256(GOLDEN_PATH),
+        "chunks_sha256": file_sha256(CHUNKS_PATH),
+        "embedding_model": f"{EMBED_MODEL}@{EMBED_REVISION}",
         "model": args.model,
         "effort": args.effort,
         "k": args.k,
         "prompt_version": PROMPT_VERSION,
     }
+    print(f"Asking {len(questions)} questions ({args.model}, effort {args.effort}, k {args.k})")
+    results = []
+    try:
+        for question in questions:
+            result = evaluate_one(question, ask)
+            print(format_result_line(result))
+            results.append(result)
+    except BaseException:  # API error, Ctrl+C, ...: keep what was already paid for
+        if results:
+            save_results(results, {**settings, "incomplete": True}, path)
+            print(
+                f"Stopped after {len(results)} of {len(questions)} questions. "
+                f"Partial results saved to {path}",
+                file=sys.stderr,
+            )
+        raise
+
     summary = save_results(results, settings, path)
     print(format_summary(summary, path))
     return 0
@@ -231,6 +261,8 @@ def format_result_line(result: QuestionResult) -> str:
         detail = f"error: {result.error}"
     elif result.refused:
         detail = "safety decline"
+    elif result.declined:
+        detail = "declined" + (f", cited {', '.join(result.cited)}" if result.cited else "")
     elif result.cited:
         detail = f"cited {', '.join(result.cited)}"
     else:

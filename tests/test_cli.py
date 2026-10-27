@@ -4,6 +4,7 @@
 `capsys` captures what the command prints, so we can check the exact output.
 """
 
+import dataclasses
 import json
 
 import anthropic
@@ -14,7 +15,7 @@ from ai_act_navigator import cli, index
 from ai_act_navigator.answer import Answer, AnswerError, Citation
 from ai_act_navigator.download import IntegrityError
 from ai_act_navigator.embed import ModelNotAvailableError
-from ai_act_navigator.golden import GoldenQuestion
+from ai_act_navigator.golden import GoldenQuestion, GoldenSetError, load_golden
 from ai_act_navigator.models import Chunk, Hit
 from ai_act_navigator.store import IndexMismatchError
 
@@ -153,9 +154,16 @@ def fake_asker(k, model, effort):
     return lambda question: (hits, ANSWER)
 
 
-def test_eval_scores_every_question_and_saves_the_results(monkeypatch, capsys, tmp_path):
+@pytest.fixture
+def fake_eval(monkeypatch):
+    """The real golden questions, all marked checked, answered by fake_asker. No cost."""
+    questions = [dataclasses.replace(q, checked=True) for q in load_golden()]
+    monkeypatch.setattr(cli, "load_golden", lambda: questions)
     monkeypatch.setattr(cli, "load_api_key", lambda: None)
     monkeypatch.setattr(cli, "make_asker", fake_asker)
+
+
+def test_eval_scores_every_question_and_saves_the_results(fake_eval, capsys, tmp_path):
     out = tmp_path / "run.json"
 
     assert cli.main(["eval", "--out", str(out), "--effort", "low"]) == 0
@@ -163,11 +171,55 @@ def test_eval_scores_every_question_and_saves_the_results(monkeypatch, capsys, t
     printed = capsys.readouterr().out
     report = json.loads(out.read_text())
     assert len(report["results"]) == 20
-    assert report["settings"]["effort"] == "low"
-    assert report["settings"]["prompt_version"] == "v1"
     assert "P1   pass  cited Art. 50(1)" in printed  # P1 expects Art. 50
-    assert "O1   FAIL  cited Art. 50(1)" in printed  # out of scope, but cited something
+    assert "O1   FAIL  cited Art. 50(1)" in printed  # out of scope, but answered
     assert f"Score: {report['summary']['passed']}/20" in printed
+
+
+def test_results_file_records_what_is_needed_to_rerun_the_score(fake_eval, tmp_path):
+    out = tmp_path / "run.json"
+    cli.main(["eval", "--out", str(out), "--effort", "low"])
+
+    settings = json.loads(out.read_text())["settings"]
+    assert settings["effort"] == "low"
+    assert settings["prompt_version"] == "v1"
+    assert settings["embedding_model"].startswith("BAAI/bge-small-en-v1.5@")
+    assert len(settings["golden_set_sha256"]) == 64
+    assert settings["git_commit"]  # a hash, "...+changes" or "unknown"
+    assert "incomplete" not in settings
+
+
+def test_eval_saves_partial_results_when_the_api_fails(fake_eval, monkeypatch, capsys, tmp_path):
+    def asker(k, model, effort):
+        answered = []
+
+        def ask(question):
+            if len(answered) == 3:
+                raise api_error(anthropic.RateLimitError, 429)
+            answered.append(question)
+            return fake_asker(k, model, effort)(question)
+
+        return ask
+
+    monkeypatch.setattr(cli, "make_asker", asker)
+    out = tmp_path / "run.json"
+
+    assert cli.main(["eval", "--out", str(out)]) == 1
+
+    report = json.loads(out.read_text())
+    assert len(report["results"]) == 3
+    assert report["settings"]["incomplete"] is True
+    err = capsys.readouterr().err
+    assert "Stopped after 3 of 20 questions" in err
+    assert "Error: Rate limit" in err
+
+
+def test_eval_never_overwrites_a_results_file(fake_eval, capsys, tmp_path):
+    out = tmp_path / "baseline.json"
+    out.write_text("{}")
+    assert cli.main(["eval", "--out", str(out)]) == 1
+    assert "already exists" in capsys.readouterr().err
+    assert out.read_text() == "{}"
 
 
 def test_eval_refuses_an_unchecked_golden_set(monkeypatch, capsys):
@@ -175,3 +227,14 @@ def test_eval_refuses_an_unchecked_golden_set(monkeypatch, capsys):
     monkeypatch.setattr(cli, "load_golden", lambda: [unchecked])
     assert cli.main(["eval"]) == 1
     assert "not checked by hand yet: P1" in capsys.readouterr().err
+
+
+def test_a_broken_golden_set_is_one_error_line(monkeypatch, capsys):
+    def broken():
+        raise GoldenSetError("golden-v1.json is not valid JSON: Expecting value")
+
+    monkeypatch.setattr(cli, "load_golden", broken)
+    assert cli.main(["eval"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("Error: golden-v1.json is not valid JSON")
+    assert "Traceback" not in err

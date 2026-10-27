@@ -15,6 +15,7 @@ from ai_act_navigator.golden import (
     MIN_PER_TYPE,
     GoldenSetError,
     article_of,
+    check_mix,
     load_golden,
 )
 
@@ -90,11 +91,25 @@ def test_loads_a_valid_file(tmp_path):
         (entry(sources=["Recital 132"]), "whole article"),
         (entry(sources=["Article 50"]), "whole article"),
         (entry(extra="x"), "extra"),  # unknown field, e.g. a typo
+        (entry(checked="no"), "true or false"),  # a string would count as checked
+        (entry(question="  "), "question is empty"),
     ],
 )
 def test_rejects_a_broken_entry(tmp_path, bad, message):
     with pytest.raises(GoldenSetError, match=message):
         load_golden(write_golden(tmp_path, bad))
+
+
+def test_rejects_a_file_that_is_not_json(tmp_path):
+    path = tmp_path / "golden.json"
+    path.write_text('{"questions": [')
+    with pytest.raises(GoldenSetError, match="not valid JSON"):
+        load_golden(path)
+
+
+def test_check_mix_names_the_type_that_is_short(tmp_path):
+    with pytest.raises(GoldenSetError, match="exact_ref 0/5"):
+        check_mix(load_golden(write_golden(tmp_path, entry())))
 
 
 def test_rejects_duplicate_ids(tmp_path):

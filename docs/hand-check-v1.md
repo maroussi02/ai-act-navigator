@@ -22,7 +22,7 @@ The "Pre-check" column is Claude's own first pass. The verdict is yours.
 
 **Summary:** 10 of 10 answers fully supported by their citations (verdicts by the project owner, 2026-10-27).
 
-**How the verdicts were decided:** "yes" means every claim with a [number] matches its quote. Missing information is a note, not a "no". A claim the quote contradicts or doesn't contain would be a "no". Two LLM-judge passes were used as a pre-check; without that rule they disagreed on Q4, which is why AN-002's automatic judge needs it in its prompt.
+**How the verdicts were decided:** "yes" means every claim with a [number] matches its quote. Missing information is a note, not a "no". A claim the quote contradicts or doesn't contain would be a "no". Two LLM-judge passes were used as a pre-check; without that rule they disagreed on Q4, which is why the automatic LLM judge (AN-004) needs it in its prompt.
 
 **Known limits found:**
 - **Search misses (fix in AN-003):** questions 8 and 9 don't retrieve the key article.
