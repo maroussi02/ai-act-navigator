@@ -19,7 +19,8 @@ uv run ruff check . && uv run ruff format .
 ## Layout
 - `src/ai_act_navigator/`: one module per pipeline step: `download` → `chunk` → `embed` /
   `store` / `index` → `search` → `answer`; `cli.py` is the `ai-act` command; `golden.py` +
-  `evaluate.py` run the golden set (`evals/golden-v1.json`).
+  `evaluate.py` run the golden set (`evals/golden-v1.json`); `prompts.toml` holds the versioned
+  prompt, loaded by `prompts.py`.
 - `tests/`: each file starts with its type (UNIT / INTEGRATION TESTS ...).
 - `docs/hand-check-v1.md`: the manual check of 10 answers (owner's verdicts).
 - `REVIEW.md`: what counts as a real bug in this repo; give it to every reviewer.

@@ -95,6 +95,7 @@ claude-sonnet-5-5 · 2426 tokens in, 96 out · cost $0.0058
 3. **Embed and store** (`embed.py`, `store.py`): an **embedding** is a list of numbers that captures what a text means, so texts with similar meaning end up close together. The model ([BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5)) runs locally, so no text leaves your machine. `ai-act index` downloads it once from Hugging Face (about 130 MB); `ai-act ask` then loads it in full offline mode, with no requests to Hugging Face. The vectors are saved in Chroma, a library that stores them as files in `data/chroma/`, with no account or server.
 4. **Search** (`search.py`): the question is embedded the same way, and the 5 closest chunks are picked.
 5. **Answer** (`answer.py`): the chunks go to Claude as *search result* blocks with citations enabled. Every numbered source in the answer is one of those chunks, with the exact quoted passage. (The prose could still name another article; the prompt forbids it, and AN-002 measures it.) If the chunks don't answer the question, Claude says so instead of guessing.
+   The instructions Claude gets live in one versioned file, [`prompts.toml`](src/ai_act_navigator/prompts.toml). Every eval result records the prompt version and a fingerprint (SHA-256) of its exact text, and a test fails if the text changes without a new version.
 
 A question costs about $0.01 at list prices.
 
@@ -143,7 +144,7 @@ CI runs the secret scan, lint, format check, tests and smoke tests on every pull
 
 | Type | What it checks | Where |
 |---|---|---|
-| Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_load_model.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_cli.py`, `test_paid_guard.py`, `test_load_chunks.py`, `test_paths.py`, `test_golden.py` (also fails until every golden-set question is checked by hand), `test_evaluate.py` |
+| Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_load_model.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_cli.py`, `test_paid_guard.py`, `test_load_chunks.py`, `test_paths.py`, `test_golden.py` (also fails until every golden-set question is checked by hand), `test_evaluate.py`, `test_prompts.py` (also fails if the prompt text changes without a new version) |
 | Integration | The parts together on real data or the real model | `test_full_text.py` (all parts found, no text lost, nothing cut off), `test_embed.py` |
 | Smoke | The real commands run and produce output | CI steps "Smoke test" (`ai-act --help`, `ai-act index`) |
 | Paid smoke | One real question through the full pipeline cites Art. 50(1) | `test_live_answer.py`, run by hand with `--run-paid -m paid` |

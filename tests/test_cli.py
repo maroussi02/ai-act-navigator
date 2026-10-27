@@ -17,6 +17,7 @@ from ai_act_navigator.download import IntegrityError
 from ai_act_navigator.embed import ModelNotAvailableError
 from ai_act_navigator.golden import GoldenQuestion, GoldenSetError, load_golden
 from ai_act_navigator.models import Chunk, Hit
+from ai_act_navigator.prompts import PROMPT_SHA256
 from ai_act_navigator.store import IndexMismatchError
 
 ANSWER = Answer(
@@ -183,6 +184,7 @@ def test_results_file_records_what_is_needed_to_rerun_the_score(fake_eval, tmp_p
     settings = json.loads(out.read_text())["settings"]
     assert settings["effort"] == "low"
     assert settings["prompt_version"] == "v1"
+    assert settings["prompt_sha256"] == PROMPT_SHA256
     assert settings["embedding_model"].startswith("BAAI/bge-small-en-v1.5@")
     assert len(settings["golden_set_sha256"]) == 64
     assert settings["git_commit"]  # a hash, "...+changes" or "unknown"
