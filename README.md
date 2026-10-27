@@ -24,12 +24,14 @@ The official English text of [Regulation (EU) 2024/1689](https://eur-lex.europa.
 uv run ai-act index                    # download the law and build the search index (~20 s, once)
 uv run ai-act ask "Does a chatbot have to tell users it is an AI?"
 uv run ai-act eval                     # score the 20-question golden set (~$0.20)
+uv run ai-act eval --search-only       # only check search, no Claude calls (free)
 ```
 
 | Option | What it does | Default |
 |---|---|---|
 | `--quotes` | Show the exact passages Claude quoted under each source | off |
 | `--k N` | How many chunks of the law Claude gets (1 to 50) | 5 |
+| `--search` | `hybrid` (meaning + keywords + named articles) or `vector` (meaning only, as in v1) | `hybrid` |
 | `--model` | Claude model | `claude-sonnet-5-5` |
 | `--effort` | How much Claude thinks first: `low`, `medium`, `high`, `xhigh`, `max` | `medium` |
 
@@ -93,7 +95,12 @@ claude-sonnet-5-5 · 2426 tokens in, 96 out · cost $0.0058
 1. **Download** (`download.py`): the official text over HTTPS, checked against a fixed SHA-256 fingerprint.
 2. **Chunk** (`chunk.py`): split along the law's own structure into 954 citable pieces, e.g. `Art. 50(1)`, `Art. 5(1), point (h)`, `Recital 12`, `Annex III, point 1`. Each is short enough (max 1,800 characters) for the embedding model to read in full.
 3. **Embed and store** (`embed.py`, `store.py`): an **embedding** is a list of numbers that captures what a text means, so texts with similar meaning end up close together. The model ([BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5)) runs locally, so no text leaves your machine. `ai-act index` downloads it once from Hugging Face (about 130 MB); `ai-act ask` then loads it in full offline mode, with no requests to Hugging Face. The vectors are saved in Chroma, a library that stores them as files in `data/chroma/`, with no account or server.
-4. **Search** (`search.py`): the question is embedded the same way, and the 5 closest chunks are picked.
+4. **Search** (`search.py`, `keyword.py`): three ranked lists of candidates, merged into one:
+   - **by meaning**: the question is embedded the same way, and the closest chunks come first;
+   - **by keywords** (BM25, the classic search-engine formula): chunks sharing the question's words, rare words counting most. "Article 4", "Art. 4" and "article 4" all count as one word, so a reference matches however it is typed;
+   - **named articles**: if the question names an article or annex ("What does Article 4 require?"), all its chunks are candidates.
+
+   The lists are merged with *Reciprocal Rank Fusion*: each chunk scores 1 / (60 + its rank) in every list it is in, and the scores add up. The 5 best chunks go to Claude.
 5. **Answer** (`answer.py`): the chunks go to Claude as *search result* blocks with citations enabled. Every numbered source in the answer is one of those chunks, with the exact quoted passage. (The prose could still name another article; the prompt forbids it, and AN-002 measures it.) If the chunks don't answer the question, Claude says so instead of guessing.
    The instructions Claude gets live in one versioned file, [`prompts.toml`](src/ai_act_navigator/prompts.toml). From now on, every eval result records the prompt version and a fingerprint (SHA-256) of its exact text, and a test fails if the text changes without a new version. (The v1 baseline predates the fingerprint; v1's is listed in `tests/test_prompts.py`.)
 
@@ -120,6 +127,19 @@ A question costs about $0.01 at list prices.
 
 Limits of the automatic score: it checks *which* articles are cited, not whether each claim is right (that is the hand check below, and the LLM judge in AN-004). A decline is recognised by its opening sentence ("The excerpts don't answer this…").
 
+### Score after each change (AN-003)
+
+Same 20 questions, same model (Sonnet 5.5, effort medium, k = 5), prompt v1. "Search found" counts the 15 questions the AI Act answers.
+
+| Change | Score | Exact reference | Plain language | Not in the AI Act | Search found | Results |
+|---|---|---|---|---|---|---|
+| v1: meaning search | 14/20 | 1/5 | 8/10 | 5/5 | 9/15 | [file](evals/results/2026-10-27-171944-claude-sonnet-5-5-medium-k5.json) |
+| Combined search (AN-003b) | **15/20** | **5/5** | 5/10 | 5/5 | **14/15** | [file](evals/results/2026-10-27-194440-claude-sonnet-5-5-medium-k5-hybrid.json) |
+
+**Combined search:** every question that names an article now finds and cites it (1/5 → 5/5). Emotion recognition at work (P8) now passes too. But 4 plain-language questions that passed in v1 now fail (P1, P3, P6, P7). All 4 decline although their article was sent: search found the right *article* but not its key *paragraph*. Example: "Does a chatbot have to tell users it is an AI?" gets Art. 50(4) (deepfakes) instead of Art. 50(1) (chatbots), and the answer says the excerpts don't include the rule. Merging rewards chunks that several lists rank fairly high, which can push out meaning search's single best hit: those paragraphs ended up at ranks 6 to 17. Putting the best of the candidates first is the reranker's job (next step). The remaining search miss is P9 ("When do the high-risk rules start to apply?"): nothing in its wording points to Art. 113.
+
+The search columns are free to check: `uv run ai-act eval --search-only` (add `--search vector` for v1). Every step is measured on the same 20 questions, so a better score can partly reflect fitting them; to limit that, the search settings are standard values (BM25 k1 = 1.5, b = 0.75; fusion constant 60), not tuned on these questions.
+
 ### Hand check v1
 
 [Hand check v1](docs/hand-check-v1.md): 10 real questions, each source checked against what the answer claims. **Result: 10 of 10 answers supported by their citations.** Known limits, to be fixed in the next tickets:
@@ -144,7 +164,7 @@ CI runs the secret scan, lint, format check, tests and smoke tests on every pull
 
 | Type | What it checks | Where |
 |---|---|---|
-| Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_load_model.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_cli.py`, `test_paid_guard.py`, `test_load_chunks.py`, `test_paths.py`, `test_golden.py` (also fails until every golden-set question is checked by hand), `test_evaluate.py`, `test_prompts.py` (also fails if the prompt text changes without a new version) |
-| Integration | The parts together on real data or the real model | `test_full_text.py` (all parts found, no text lost, nothing cut off), `test_embed.py` |
+| Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_load_model.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_cli.py`, `test_paid_guard.py`, `test_load_chunks.py`, `test_paths.py`, `test_golden.py` (also fails until every golden-set question is checked by hand), `test_evaluate.py`, `test_prompts.py` (also fails if the prompt text changes without a new version), `test_refs.py`, `test_keyword.py` |
+| Integration | The parts together on real data or the real model | `test_full_text.py` (all parts found, no text lost, nothing cut off), `test_embed.py`, `test_named_articles.py` (a question naming an article finds it, even with meaning search switched off) |
 | Smoke | The real commands run and produce output | CI steps "Smoke test" (`ai-act --help`, `ai-act index`) |
 | Paid smoke | One real question through the full pipeline cites Art. 50(1) | `test_live_answer.py`, run by hand with `--run-paid -m paid` |
