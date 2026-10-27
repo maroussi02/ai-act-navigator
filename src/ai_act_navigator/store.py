@@ -77,18 +77,16 @@ class VectorStore:
         """The k chunks closest in meaning to the query, best first."""
         built_with = (self._collection.metadata or {}).get("embedding_model")
         if self.count() == 0:
-            raise IndexMismatchError(
-                "The index is empty. Build it with: uv run python -m ai_act_navigator.index"
-            )
+            raise IndexMismatchError("The index is empty. Build it with: uv run ai-act index")
         if built_with is None:
             raise IndexMismatchError(
                 "The index was built by an older version that didn't record its model. "
-                "Rebuild it: uv run python -m ai_act_navigator.index"
+                "Rebuild it: uv run ai-act index"
             )
         if built_with != self.embedding_model:
             raise IndexMismatchError(
                 f"The index was built with {built_with}, but search uses "
-                f"{self.embedding_model}. Rebuild it: uv run python -m ai_act_navigator.index"
+                f"{self.embedding_model}. Rebuild it: uv run ai-act index"
             )
 
         result = self._collection.query(query_embeddings=[query_embedding], n_results=k)

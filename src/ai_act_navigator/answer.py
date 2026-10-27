@@ -7,11 +7,9 @@ our list plus the exact quoted text. So the numbered sources can only ever be ch
 sent. (The answer *text* could still mention another article by name; the prompt tells
 Claude not to, and AN-002's checks will measure how often it happens.)
 
-Run it:  uv run python -m ai_act_navigator.answer "Does a chatbot have to tell users it is an AI?"
+Used by the command-line tool:  uv run ai-act ask "Does a chatbot have to tell users it is an AI?"
 """
 
-import os
-import sys
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -203,42 +201,3 @@ def cost_usd(
         + output_tokens * output_price
     )
     return total / 1_000_000
-
-
-def main() -> None:
-    """Answer the question given on the command line and print the sources and cost."""
-    from dotenv import load_dotenv
-
-    from ai_act_navigator.embed import Embedder  # imported here: loading the model is slow
-    from ai_act_navigator.paths import PROJECT_ROOT
-    from ai_act_navigator.search import search
-    from ai_act_navigator.store import VectorStore
-
-    question = " ".join(sys.argv[1:]).strip()
-    if not question:
-        sys.exit('Usage: uv run python -m ai_act_navigator.answer "your question"')
-
-    # Reads ANTHROPIC_API_KEY from the git-ignored .env file into the environment, where
-    # the Anthropic client finds it. The key is never printed or logged.
-    load_dotenv(PROJECT_ROOT / ".env")
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        sys.exit("ANTHROPIC_API_KEY is missing. Copy .env.example to .env and add your key.")
-
-    embedder = Embedder()
-    hits = search(question, embedder, VectorStore(embedder.model_id))
-    result = answer(question, hits, Anthropic())
-
-    print(result.text)
-    print("\nSources:" if result.citations else "\nSources: none")
-    for c in result.citations:
-        print(f"  [{c.number}] {c.ref}  {c.url}")
-    cost = f"${result.cost_usd:.4f}" if result.cost_usd is not None else "unknown"
-    print(
-        f"\n{result.model} · {result.input_tokens} tokens in, "
-        f"{result.output_tokens} out · cost {cost}"
-    )
-
-
-# Runs main() only when started as a program, not when imported by tests.
-if __name__ == "__main__":
-    main()
