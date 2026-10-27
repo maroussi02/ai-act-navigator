@@ -1,0 +1,178 @@
+{
+  "version": "v1",
+  "about": "20 questions with known correct answers (AN-002). 'sources' are article-level refs: an answer passes if it cites any of them. For type 'out_of_scope', 'sources' is empty and the answer passes if it cites nothing. 'origin' says where a question came from. 'checked' turns true once the answer and sources were checked by hand against the official text.",
+  "questions": [
+    {
+      "id": "E1",
+      "type": "exact_ref",
+      "question": "What does Article 4 require?",
+      "answer": "Providers and deployers of AI systems must take measures to ensure, to their best extent, a sufficient level of AI literacy of their staff and others operating AI systems on their behalf.",
+      "sources": ["Art. 4"],
+      "checked": false
+    },
+    {
+      "id": "E2",
+      "type": "exact_ref",
+      "question": "What does Article 14 say?",
+      "answer": "High-risk AI systems must be designed so that natural persons can effectively oversee them while in use, including being able to understand, override or stop the system.",
+      "sources": ["Art. 14"],
+      "checked": false
+    },
+    {
+      "id": "E3",
+      "type": "exact_ref",
+      "question": "What does Article 26 require from deployers?",
+      "answer": "Deployers of high-risk AI systems must use them according to the instructions for use and assign human oversight to people with the necessary competence, training and authority, among other duties.",
+      "sources": ["Art. 26"],
+      "checked": false
+    },
+    {
+      "id": "E4",
+      "type": "exact_ref",
+      "question": "What is listed in Annex III?",
+      "answer": "The high-risk areas under Article 6(2): biometrics, critical infrastructure, education, employment, essential private and public services, law enforcement, migration and border control, and administration of justice and democratic processes.",
+      "sources": ["Annex III"],
+      "checked": false
+    },
+    {
+      "id": "E5",
+      "type": "exact_ref",
+      "question": "What does Article 113 say?",
+      "answer": "The Regulation enters into force 20 days after publication and applies from 2 August 2026, except Chapters I and II (2 February 2025), certain chapters including GPAI rules and penalties (2 August 2025), and Article 6(1) (2 August 2027).",
+      "sources": ["Art. 113"],
+      "checked": false
+    },
+    {
+      "id": "P1",
+      "type": "plain",
+      "question": "Does a chatbot have to tell users it is an AI?",
+      "answer": "Yes. Providers must design AI systems that interact with people so that they are told they are interacting with an AI, unless this is obvious from the context. Exception for systems authorised by law for criminal investigations.",
+      "sources": ["Art. 50"],
+      "checked": false,
+      "origin": "hand check v1, Q1"
+    },
+    {
+      "id": "P2",
+      "type": "plain",
+      "question": "Which AI practices are prohibited?",
+      "answer": "Eight practices in Article 5(1), points (a) to (h): subliminal or manipulative techniques, exploiting vulnerabilities, social scoring, predicting crime from profiling alone, untargeted scraping of facial images, emotion recognition at work and in education, biometric categorisation by sensitive traits, and real-time remote biometric identification in public spaces for law enforcement (with exceptions).",
+      "sources": ["Art. 5"],
+      "checked": false,
+      "origin": "hand check v1, Q2"
+    },
+    {
+      "id": "P3",
+      "type": "plain",
+      "question": "What makes an AI system high-risk?",
+      "answer": "Either it is a safety component of (or itself) a product under the EU laws in Annex I that needs a third-party conformity assessment (Art. 6(1)), or it is used in one of the areas listed in Annex III (Art. 6(2)), subject to the exceptions in Art. 6(3).",
+      "sources": ["Art. 6", "Annex III"],
+      "checked": false,
+      "origin": "hand check v1, Q3"
+    },
+    {
+      "id": "P4",
+      "type": "plain",
+      "question": "What are the maximum fines for breaking the prohibitions?",
+      "answer": "Up to EUR 35 million or 7% of worldwide annual turnover, whichever is higher. For SMEs and start-ups, whichever is lower (Art. 99(6)). EU institutions: up to EUR 1.5 million (Art. 100).",
+      "sources": ["Art. 99"],
+      "checked": false,
+      "origin": "hand check v1, Q4"
+    },
+    {
+      "id": "P5",
+      "type": "plain",
+      "question": "Do deepfakes have to be labelled?",
+      "answer": "Yes. Deployers must disclose that deepfake image, audio or video content is artificially generated or manipulated. For artistic, satirical or fictional works, a light disclosure that does not hamper the work is enough. Exception for uses authorised by law for criminal investigations.",
+      "sources": ["Art. 50"],
+      "checked": false,
+      "origin": "hand check v1, Q5"
+    },
+    {
+      "id": "P6",
+      "type": "plain",
+      "question": "What obligations do providers of general-purpose AI models have?",
+      "answer": "Keep technical documentation, give information to providers that integrate the model, have a copyright compliance policy, and publish a summary of the training content. Models with systemic risk have extra duties.",
+      "sources": ["Art. 53"],
+      "checked": false,
+      "origin": "hand check v1, Q6"
+    },
+    {
+      "id": "P7",
+      "type": "plain",
+      "question": "Who counts as a provider under the AI Act?",
+      "answer": "Anyone (person, company, authority or other body) who develops an AI system or general-purpose AI model, or has one developed, and places it on the market or puts it into service under their own name or trademark, paid or free.",
+      "sources": ["Art. 3"],
+      "checked": false,
+      "origin": "hand check v1, Q7"
+    },
+    {
+      "id": "P8",
+      "type": "plain",
+      "question": "Is emotion recognition in the workplace allowed?",
+      "answer": "No. AI systems that infer emotions of people at the workplace or in education are prohibited, except for medical or safety reasons.",
+      "sources": ["Art. 5"],
+      "checked": false,
+      "origin": "hand check v1, Q8 (known search miss in v1)"
+    },
+    {
+      "id": "P9",
+      "type": "plain",
+      "question": "When do the rules for high-risk AI systems start to apply?",
+      "answer": "From 2 August 2026 in general (including Annex III systems). For high-risk systems under Article 6(1) (product safety), from 2 August 2027.",
+      "sources": ["Art. 113"],
+      "checked": false,
+      "origin": "hand check v1, Q9 (known search miss in v1)"
+    },
+    {
+      "id": "P10",
+      "type": "plain",
+      "question": "Does the AI Act apply to AI used only for military purposes?",
+      "answer": "No. It does not apply to AI systems placed on the market, put into service or used exclusively for military, defence or national security purposes.",
+      "sources": ["Art. 2"],
+      "checked": false
+    },
+    {
+      "id": "O1",
+      "type": "out_of_scope",
+      "question": "What is the VAT rate in Germany?",
+      "answer": "Not in the AI Act.",
+      "sources": [],
+      "checked": false,
+      "origin": "hand check v1, Q10"
+    },
+    {
+      "id": "O2",
+      "type": "out_of_scope",
+      "question": "What is the maximum fine under the GDPR?",
+      "answer": "Not in the AI Act. It mentions the GDPR but does not state its fines.",
+      "sources": [],
+      "checked": false,
+      "note": "Trick: close to the AI Act fines (Art. 99)."
+    },
+    {
+      "id": "O3",
+      "type": "out_of_scope",
+      "question": "Who owns the copyright in images our AI system generates?",
+      "answer": "Not in the AI Act. It requires GPAI providers to have a copyright compliance policy (Art. 53(1)(c)), but does not decide who owns AI outputs.",
+      "sources": [],
+      "checked": false,
+      "note": "Trick: close to Art. 53(1)(c). Claude may cite it while saying ownership isn't covered, which the zero-citations rule scores as a fail."
+    },
+    {
+      "id": "O4",
+      "type": "out_of_scope",
+      "question": "Which AI law applies to our product in the United States?",
+      "answer": "Not in the AI Act. It covers the EU only and does not mention US law.",
+      "sources": [],
+      "checked": false
+    },
+    {
+      "id": "O5",
+      "type": "out_of_scope",
+      "question": "Can we patent our AI model in the EU?",
+      "answer": "Not in the AI Act. Patents are not covered.",
+      "sources": [],
+      "checked": false
+    }
+  ]
+}
