@@ -22,6 +22,8 @@ uv run ruff check . && uv run ruff format .
   `evaluate.py` run the golden set (`evals/golden-v1.json`).
 - `tests/`: each file starts with its type (UNIT / INTEGRATION TESTS ...).
 - `docs/hand-check-v1.md`: the manual check of 10 answers (owner's verdicts).
+- `REVIEW.md`: what counts as a real bug in this repo; give it to every reviewer.
+- `.github/pull_request_template.md`: every PR answers Testing, Risk and How to revert.
 
 ## Conventions
 - **Comments:** every module and function gets a plain-language docstring saying what it does
