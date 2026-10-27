@@ -1,0 +1,623 @@
+{
+  "settings": {
+    "date": "2026-10-27T17:19:44+00:00",
+    "git_commit": "89a00b0fa952efea391627fe6d85b76b817f254c",
+    "golden_set": "golden-v1.json",
+    "golden_set_sha256": "826cf22e670751f56d64434028840f41e0c7fec29eca5bc50448f79e952a8e20",
+    "chunks_sha256": "617e669e9dc602a14c57bcc0ba9d1b1df21a7003571fb3f1c984bea4ed25cd53",
+    "embedding_model": "BAAI/bge-small-en-v1.5@5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "k": 5,
+    "prompt_version": "v1"
+  },
+  "summary": {
+    "passed": 14,
+    "total": 20,
+    "by_type": {
+      "exact_ref": {
+        "passed": 1,
+        "total": 5
+      },
+      "plain": {
+        "passed": 8,
+        "total": 10
+      },
+      "out_of_scope": {
+        "passed": 5,
+        "total": 5
+      }
+    },
+    "retrieved": {
+      "found": 9,
+      "total": 15
+    },
+    "wrongly_declined": 0,
+    "with_retrieved_uncited": 5,
+    "with_outside_knowledge": 0,
+    "refused": 0,
+    "errors": 0,
+    "cost_usd": 0.1955
+  },
+  "results": [
+    {
+      "id": "E1",
+      "type": "exact_ref",
+      "question": "What does Article 4 require?",
+      "passed": false,
+      "expected": [
+        "Art. 4"
+      ],
+      "cited": [],
+      "declined": true,
+      "retrieved": false,
+      "sent": [
+        "Art. 109",
+        "Art. 11(3)",
+        "Recital 82",
+        "Art. 91(4)",
+        "Art. 107"
+      ],
+      "retrieved_uncited": [
+        "Art. 107",
+        "Art. 11",
+        "Art. 91"
+      ],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts provided don't include Article 4 of the AI Act, so I can't say what it requires. They cover other provisions: Article 11(3) on technical documentation, Article 91(4) on requests for information, Articles 107 and 109 on amendments to other regulations, and Recital 82 on authorised representatives.\n\nIf you share the text of Article 4, I can summarize it.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.006188,
+      "error": ""
+    },
+    {
+      "id": "E2",
+      "type": "exact_ref",
+      "question": "What does Article 14 say?",
+      "passed": false,
+      "expected": [
+        "Art. 14"
+      ],
+      "cited": [
+        "Art. 105"
+      ],
+      "declined": true,
+      "retrieved": false,
+      "sent": [
+        "Recital 171",
+        "Art. 105",
+        "Art. 106",
+        "Art. 86(3)",
+        "Recital 176"
+      ],
+      "retrieved_uncited": [
+        "Art. 86"
+      ],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't include Article 14, so I can't say what it provides. They contain Recital 171, Article 86(3), Articles 105 and 106 (amendments to other directives), and Recital 176, none of which set out Article 14's text.\n\nThe excerpts do mention Chapter III, Section 2 in passing. Article 105 says the Commission must take into account the requirements in Chapter III, Section 2 of the Regulation when adopting technical specifications and testing standards for AI systems that are safety components. [1] The excerpts don't say which articles that section contains or what they require, so I can't confirm that Article 14 is part of it or what it says.\n\nIf you share the text of Article 14, I can help interpret it.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.007722,
+      "error": ""
+    },
+    {
+      "id": "E3",
+      "type": "exact_ref",
+      "question": "What does Article 26 require from deployers?",
+      "passed": true,
+      "expected": [
+        "Art. 26"
+      ],
+      "cited": [
+        "Art. 26(1)",
+        "Art. 26(2)",
+        "Art. 26(3)",
+        "Art. 26(5)",
+        "Art. 26(10)"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 26(3)",
+        "Art. 26(1)",
+        "Art. 26(2)",
+        "Art. 26(5)",
+        "Art. 26(10)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts cover only parts of Article 26 (paragraphs 1, 2, 3, 5 and part of 10), so this is not a complete list.\n\n**Core obligations for deployers of high-risk AI systems:**\n\n- **Use as instructed:** Deployers must take appropriate technical and organisational measures to ensure they use such systems in accordance with the instructions for use accompanying the systems. [1]\n- **Human oversight:** Deployers must assign human oversight to natural persons who have the necessary competence, training and authority, as well as the necessary support. [2] Deployers remain free to organise their own resources and activities to implement the human oversight measures indicated by the provider. [3]\n- **Monitoring:** Deployers must monitor the system's operation on the basis of the instructions for use and, where relevant, inform providers in accordance with Article 72. [4]\n- **Risk escalation:** If a deployer has reason to consider that use in accordance with the instructions may result in the system presenting a risk within the meaning of Article 79(1), it must without undue delay inform the provider or distributor and the relevant market surveillance authority, and suspend use of the system. [4]\n- **Serious incidents:** Deployers must immediately inform first the provider, then the importer or distributor and the relevant market surveillance authorities. If the provider can't be reached, Article 73 applies mutatis mutandis. [4]\n\n**Exceptions and special rules:**\n\n- The monitoring and incident-reporting obligation doesn't cover sensitive operational data of deployers that are law enforcement authorities. [4]\n- For deployers that are financial institutions subject to internal governance requirements under Union financial services law, the monitoring obligation is deemed fulfilled by complying with those internal governance rules. [4]\n- These obligations are without prejudice to other deployer obligations under Union or national law. [3]\n\n**Post-remote biometric identification (from the Article 26(10) excerpt):**\n\n- Each use must be documented in the relevant police file and made available to the market surveillance authority and national data protection authority on request, excluding sensitive law enforcement operational data. [5]\n- Deployers must submit annual reports to those authorities on their use of such systems. The reports may be aggregated to cover more than one deployment. [5]\n- Member States may introduce more restrictive laws on the use of these systems. [5]\n\nThe excerpts don't include the other paragraphs of Article 26 (4, 6–9 and 11 onward), so I can't say what those require.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.01561,
+      "error": ""
+    },
+    {
+      "id": "E4",
+      "type": "exact_ref",
+      "question": "What is listed in Annex III?",
+      "passed": false,
+      "expected": [
+        "Annex III"
+      ],
+      "cited": [
+        "Art. 7(1)",
+        "Art. 7(3)"
+      ],
+      "declined": true,
+      "retrieved": false,
+      "sent": [
+        "Art. 7(1)",
+        "Art. 7(3)",
+        "Annex VII, point 3",
+        "Art. 7(2), point (f)",
+        "Art. 7(2), point (a)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't contain the actual content of Annex III, so I can't tell you which use-cases it lists.\n\nWhat they do show is how Annex III works:\n\n- It is a list of high-risk AI system use-cases, organised by \"areas.\" The Commission can amend it by delegated act, adding or modifying use-cases where the AI systems are intended to be used in an area listed in Annex III and pose a risk of harm to health and safety, or an adverse impact on fundamental rights, equivalent to or greater than that of systems already listed. [1]\n- The Commission can also remove high-risk AI systems from the list if they no longer pose any significant risks to fundamental rights, health or safety, and the deletion does not decrease the overall level of protection of health, safety and fundamental rights under Union law. [2]\n\nTo see the actual areas and use-cases, you would need the text of Annex III itself.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.008714,
+      "error": ""
+    },
+    {
+      "id": "E5",
+      "type": "exact_ref",
+      "question": "What does Article 113 say?",
+      "passed": false,
+      "expected": [
+        "Art. 113"
+      ],
+      "cited": [],
+      "declined": true,
+      "retrieved": false,
+      "sent": [
+        "Art. 108, point (3)",
+        "Art. 108, point (1)",
+        "Art. 108, point (4)",
+        "Art. 108, point (2)",
+        "Art. 108, point (5)"
+      ],
+      "retrieved_uncited": [
+        "Art. 108"
+      ],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't include Article 113, so I can't say what it provides. They only contain points (1) to (5) of Article 108, which amend Regulation (EU) 2018/1139 (Articles 17, 19, 43, 47 and 57).\n\nIf you share the text of Article 113, I can summarize it.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.006658,
+      "error": ""
+    },
+    {
+      "id": "P1",
+      "type": "plain",
+      "question": "Does a chatbot have to tell users it is an AI?",
+      "passed": true,
+      "expected": [
+        "Art. 50"
+      ],
+      "cited": [
+        "Art. 50(1)",
+        "Recital 132"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 50(1)",
+        "Art. 50(3)",
+        "Art. 50(2)",
+        "Recital 44",
+        "Recital 132"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "Yes, in general. Providers must ensure that AI systems intended to interact directly with natural persons are designed and developed so that the people concerned are informed they are interacting with an AI system. [1]\n\n**Exceptions and conditions:**\n- **Obvious from context:** The duty doesn't apply if it is obvious from the point of view of a reasonably well-informed, observant and circumspect person, taking into account the circumstances and the context of use. [1]\n- **Law enforcement:** The obligation doesn't apply to AI systems authorised by law to detect, prevent, investigate or prosecute criminal offences, subject to appropriate safeguards for third parties' rights and freedoms. This exception doesn't hold if those systems are available for the public to report a criminal offence. [1]\n\n**Design considerations:** When implementing this obligation, the characteristics of people in vulnerable groups due to age or disability should be taken into account to the extent the system is intended to interact with those groups. Notifications should be provided in accessible formats for persons with disabilities. [2]\n\nNote that the obligation in Art. 50(1) is placed on the **provider** (the one designing and developing the system), so the disclosure should be built into the product itself.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.011052,
+      "error": ""
+    },
+    {
+      "id": "P2",
+      "type": "plain",
+      "question": "Which AI practices are prohibited?",
+      "passed": true,
+      "expected": [
+        "Art. 5"
+      ],
+      "cited": [
+        "Art. 5(1), point (a)",
+        "Art. 5(1), point (b)",
+        "Art. 5(1), point (d)",
+        "Art. 5(1), point (e)",
+        "Art. 5(1), point (f)"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 5(1), point (a)",
+        "Art. 5(1), point (f)",
+        "Art. 5(1), point (e)",
+        "Art. 5(1), point (b)",
+        "Art. 5(1), point (d)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts cover five prohibited practices under Article 5(1), points (a), (b), (d), (e) and (f). They do not include point (c) or any later points, so this list may not be complete.\n\n1. **Subliminal or manipulative techniques (point a):** AI systems that deploy subliminal techniques beyond a person's consciousness, or purposefully manipulative or deceptive techniques, with the objective or effect of materially distorting behaviour by appreciably impairing the ability to make an informed decision, thereby causing a decision the person would not otherwise have taken, in a manner that causes or is reasonably likely to cause significant harm. [1]\n\n2. **Exploiting vulnerabilities (point b):** AI systems that exploit vulnerabilities of a person or specific group due to their age, disability or a specific social or economic situation, with the objective or effect of materially distorting behaviour in a manner that causes or is reasonably likely to cause significant harm. [2]\n\n3. **Crime-risk prediction based solely on profiling (point d):** AI systems used for risk assessments of natural persons to assess or predict the risk of committing a criminal offence, based solely on profiling or on assessing personality traits and characteristics. [3] The exception is that the prohibition does not apply to AI systems used to support the human assessment of a person's involvement in a criminal activity, which is already based on objective and verifiable facts directly linked to a criminal activity. [3]\n\n4. **Facial recognition database scraping (point e):** AI systems that create or expand facial recognition databases through the untargeted scraping of facial images from the internet or CCTV footage. [4]\n\n5. **Emotion inference at work and in education (point f):** AI systems used to infer emotions of a natural person in the areas of workplace and education institutions, [5] except where the system is intended to be put in place or into the market for medical or safety reasons. [5]\n\nFor all of these, the prohibition applies to placing on the market, putting into service, or use. Points (d), (e) and (f) specify putting into service \"for this specific purpose\" [5] [4] [3].",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.013138,
+      "error": ""
+    },
+    {
+      "id": "P3",
+      "type": "plain",
+      "question": "What makes an AI system high-risk?",
+      "passed": true,
+      "expected": [
+        "Art. 6",
+        "Annex III"
+      ],
+      "cited": [
+        "Art. 6(1)",
+        "Annex III, point 2"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 9(6)",
+        "Annex III, point 2",
+        "Art. 6(1)",
+        "Art. 15(4)",
+        "Art. 15(1)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts describe two routes to high-risk classification. They don't cover every route, so this may be incomplete.\n\n**Route 1: Product safety component (Art. 6(1)).** An AI system is high-risk where both conditions are met: (a) it is intended to be used as a safety component of a product, or is itself a product, covered by the Union harmonisation legislation listed in Annex I; and (b) that product (or the AI system itself as a product) must undergo a third-party conformity assessment before being placed on the market or put into service under that legislation. [1] This applies regardless of whether the AI system is placed on the market or put into service independently of the product. [1]\n\n**Route 2: Listed use areas (Art. 6(2) / Annex III).** AI systems are high-risk if they fall within the areas listed in Annex III. [2] The excerpt covers only one area, critical infrastructure: AI systems intended to be used as safety components in the management and operation of critical digital infrastructure, road traffic, or the supply of water, gas, heating or electricity. [2]\n\n**What the excerpts don't cover:** the other Annex III areas, the contents of the Annex I list, and any exceptions to classification. I can't say more on those from the text provided.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.009722,
+      "error": ""
+    },
+    {
+      "id": "P4",
+      "type": "plain",
+      "question": "What are the maximum fines for breaking the prohibitions?",
+      "passed": true,
+      "expected": [
+        "Art. 99"
+      ],
+      "cited": [
+        "Art. 99(3)",
+        "Art. 100(2)"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 99(3)",
+        "Art. 100(3)",
+        "Art. 100(2)",
+        "Art. 99(5)",
+        "Art. 99(4)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The maximum fine depends on who breaks the prohibition.\n\n- **Companies and other operators:** Non-compliance with the prohibited AI practices in Article 5 is subject to administrative fines of up to EUR 35,000,000 or, if the offender is an undertaking, up to 7% of its total worldwide annual turnover for the preceding financial year, whichever is higher. [1]\n\n- **Union institutions, bodies, offices and agencies:** Non-compliance with the Article 5 prohibitions is subject to administrative fines of up to EUR 1,500,000. [2]\n\nFor an undertaking, the \"whichever is higher\" wording means the 7% turnover figure applies whenever it exceeds EUR 35 million.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.007554,
+      "error": ""
+    },
+    {
+      "id": "P5",
+      "type": "plain",
+      "question": "Do deepfakes have to be labelled?",
+      "passed": true,
+      "expected": [
+        "Art. 50"
+      ],
+      "cited": [
+        "Art. 50(4)",
+        "Recital 134"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Recital 134",
+        "Art. 50(4)",
+        "Art. 13(3), point (f)",
+        "Art. 27(3)",
+        "Art. 6(4)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "Yes. Deployers of an AI system that generates or manipulates image, audio or video content constituting a deep fake must disclose that the content has been artificially generated or manipulated. [1] The recitals describe deep fakes as content that appreciably resembles existing persons, objects, places, entities or events and would falsely appear to a person to be authentic or truthful [2], and say the disclosure should be clear and distinguishable.\n\n**Exceptions and limits:**\n- **Law enforcement:** The obligation does not apply where the use is authorised by law to detect, prevent, investigate or prosecute criminal offences. [1]\n- **Artistic, creative, satirical or fictional works:** Where the content forms part of an evidently artistic, creative, satirical, fictional or analogous work or programme, the obligation is limited to disclosing the existence of the generated or manipulated content in an appropriate manner that does not hamper the display or enjoyment of the work. [1]\n\n**Related rule for text:** Deployers of an AI system that generates or manipulates text published to inform the public on matters of public interest must disclose that it was artificially generated or manipulated, unless the content has undergone human review or editorial control and a natural or legal person holds editorial responsibility for its publication. [1]\n\nNote that the obligation in these excerpts falls on deployers. The recital refers to this as being further to the technical solutions employed by the providers of the AI system [2], but the excerpts don't detail what those provider obligations are.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.011692,
+      "error": ""
+    },
+    {
+      "id": "P6",
+      "type": "plain",
+      "question": "What obligations do providers of general-purpose AI models have?",
+      "passed": true,
+      "expected": [
+        "Art. 53"
+      ],
+      "cited": [
+        "Art. 53(1)",
+        "Art. 53(3)",
+        "Art. 53(2)",
+        "Art. 54(2)",
+        "Art. 54(6)"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 53(3)",
+        "Art. 53(1)",
+        "Art. 53(2)",
+        "Art. 54(6)",
+        "Art. 54(2)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "Providers of general-purpose AI models have four core obligations under Article 53(1), plus a duty to cooperate with authorities.\n\n**Core obligations (Art. 53(1))**\n- **Technical documentation:** Draw up and keep up-to-date the technical documentation of the model, including its training and testing process and the results of its evaluation, containing at a minimum the information in Annex XI, to provide upon request to the AI Office and national competent authorities. [1]\n- **Information for downstream providers:** Draw up, keep up-to-date and make available information and documentation to providers of AI systems who intend to integrate the model. It must enable them to understand the model's capabilities and limitations and to comply with their own obligations, and contain at least the elements in Annex XII. [1] This is without prejudice to the need to protect intellectual property rights and confidential business information or trade secrets. [1]\n- **Copyright policy:** Put in place a policy to comply with Union copyright law, in particular to identify and comply with, including through state-of-the-art technologies, a reservation of rights expressed under Article 4(3) of Directive (EU) 2019/790. [1]\n- **Training content summary:** Draw up and make publicly available a sufficiently detailed summary about the content used for training, according to a template provided by the AI Office. [1]\n\n**Cooperation (Art. 53(3))**\nProviders must cooperate as necessary with the Commission and national competent authorities in the exercise of their competences and powers under the Regulation. [2]\n\n**Open-source exception**\n- The documentation obligations in points (a) and (b) do not apply to providers of models released under a free and open-source licence that allows access, usage, modification, and distribution, and whose parameters (including weights), model architecture information, and usage information are publicly available. [3]\n- This exception does not apply to general-purpose AI models with systemic risks. [3]\n- Because the exception is limited to points (a) and (b), the copyright policy and training content summary obligations are not covered by it, based on the text of Art. 53(2).\n\n**Authorised representatives (Art. 54)**\nThe excerpts also show that the provider must enable its authorised representative to perform the tasks in the mandate it received from the provider. [4] This Article's obligation does not apply to providers of open-source models meeting the conditions above, unless the models present systemic risks. [5] The excerpts don't say who must appoint a representative, so I can't detail that.\n\nThe excerpts don't cover the additional obligations for models with systemic risk.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.015008,
+      "error": ""
+    },
+    {
+      "id": "P7",
+      "type": "plain",
+      "question": "Who counts as a provider under the AI Act?",
+      "passed": true,
+      "expected": [
+        "Art. 3"
+      ],
+      "cited": [
+        "Art. 3, point (3)"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Art. 54(2)",
+        "Art. 54(4)",
+        "Art. 22(2)",
+        "Art. 3, point (3)",
+        "Art. 54(5)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "Under the AI Act, a provider is a natural or legal person, public authority, agency or other body that develops an AI system or a general-purpose AI model, or that has an AI system or a general-purpose AI model developed, and places it on the market or puts the AI system into service under its own name or trademark, whether for payment or free of charge. [1]\n\nKey points from the definition:\n\n- **Who qualifies:** Individuals, companies, public authorities, agencies, and other bodies can all be providers.\n- **Developing or commissioning:** You count whether you build the system or model yourself or have someone else build it for you.\n- **Market placement under your name:** You must place it on the market, or put the AI system into service, under your own name or trademark.\n- **Payment doesn't matter:** Free-of-charge supply is covered too.\n\nThe excerpts only include the definition itself. They don't address other roles or situations where a party might be treated as a provider.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.00747,
+      "error": ""
+    },
+    {
+      "id": "P8",
+      "type": "plain",
+      "question": "Is emotion recognition in the workplace allowed?",
+      "passed": false,
+      "expected": [
+        "Art. 5"
+      ],
+      "cited": [
+        "Recital 44",
+        "Art. 3, point (39)",
+        "Recital 18",
+        "Art. 50(3)"
+      ],
+      "declined": false,
+      "retrieved": false,
+      "sent": [
+        "Recital 44",
+        "Art. 50(3)",
+        "Recital 18",
+        "Art. 3, point (39)",
+        "Recital 57"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "Based on the excerpts, the answer is generally no. The recitals say workplace emotion recognition should be prohibited, with an exception for medical or safety uses.\n\n**The prohibition.** Recital 44 states that the placing on the market, the putting into service, or the use of AI systems intended to be used to detect the emotional state of individuals in situations related to the workplace and education should be prohibited. [1] The stated reasons are that AI systems identifying or inferring emotions or intentions of natural persons on the basis of their biometric data may lead to discriminatory outcomes and can be intrusive [1], and that there is an imbalance of power in the context of work or education [1].\n\n**Exception.** The prohibition should not cover AI systems placed on the market strictly for medical or safety reasons, such as systems intended for therapeutical use. [1]\n\n**What counts as emotion recognition.** An emotion recognition system is an AI system for the purpose of identifying or inferring emotions or intentions of natural persons on the basis of their biometric data [2]. Recital 18 narrows this:\n- It does not include physical states, such as pain or fatigue, including, for example, systems used in detecting the state of fatigue of professional pilots or drivers for the purpose of preventing accidents. [3]\n- It also does not include the mere detection of readily apparent expressions, gestures or movements, unless they are used for identifying or inferring emotions [3], such as a frown, a smile, or a raised voice.\n\n**Caveat.** The excerpts I have are recitals, which explain the reasoning behind the Act. They do not include the operative article containing the prohibition itself, so I can't confirm its exact wording from these excerpts. Article 50(3) separately requires deployers of emotion recognition systems to inform the natural persons exposed thereto of the operation of the system [4]. That obligation applies to systems that are permitted.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.013582,
+      "error": ""
+    },
+    {
+      "id": "P9",
+      "type": "plain",
+      "question": "When do the rules for high-risk AI systems start to apply?",
+      "passed": false,
+      "expected": [
+        "Art. 113"
+      ],
+      "cited": [
+        "Art. 111(2)",
+        "Art. 6(5)"
+      ],
+      "declined": true,
+      "retrieved": false,
+      "sent": [
+        "Art. 6(5)",
+        "Art. 6(1)",
+        "Art. 6(2)",
+        "Art. 111(2)",
+        "Art. 9(6)"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't state a general start date for the high-risk rules, so I can't give you that date from them. (Art. 113, the application provision, isn't included.)\n\nWhat they do show:\n\n- **Legacy systems:** The Regulation applies to operators of high-risk AI systems placed on the market or put into service before 2 August 2026 only if, as from that date, those systems are subject to significant changes in their designs [1]. This exception is subject to the cited paragraph 1 carve-out of Article 111 and does not affect Article 5.\n- **Public authority systems:** Providers and deployers of high-risk AI systems intended to be used by public authorities shall take the necessary steps to comply by 2 August 2030. [1]\n- **Guidelines:** The Commission must provide guidelines on practical implementation of Article 6, with examples of high-risk and not high-risk use cases, no later than 2 February 2026. [2]\n\nThe reference to 2 August 2026 in Art. 111(2) suggests that date is relevant to the high-risk rules. The excerpts don't say outright that the rules start applying then, so check Article 113 to confirm.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.009148,
+      "error": ""
+    },
+    {
+      "id": "P10",
+      "type": "plain",
+      "question": "Does the AI Act apply to AI used only for military purposes?",
+      "passed": true,
+      "expected": [
+        "Art. 2"
+      ],
+      "cited": [
+        "Art. 2(3)",
+        "Recital 24"
+      ],
+      "declined": false,
+      "retrieved": true,
+      "sent": [
+        "Recital 24",
+        "Recital 24",
+        "Art. 2(10)",
+        "Art. 2(3)",
+        "Recital 53"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "No. The AI Act does not apply to AI systems used exclusively for military, defence or national security purposes.\n\n**The exclusion:** The Regulation does not apply to AI systems where and in so far they are placed on the market, put into service, or used with or without modification exclusively for military, defence or national security purposes, regardless of the type of entity carrying out those activities. [1] This applies whether the entity is public or private. [2] It also covers systems not placed on the market or put into service in the Union, where the output is used in the Union exclusively for military, defence or national security purposes. [1]\n\n**Exceptions (dual or mixed use):**\n- AI systems placed on the market or put into service for both an excluded purpose (military, defence or national security) and one or more non-excluded purposes, such as civilian or law enforcement purposes, fall within the scope of the Regulation, and providers must ensure compliance. [2]\n- If a system developed or used for military, defence or national security purposes is used outside those purposes, temporarily or permanently, for example for civilian, humanitarian, law enforcement or public security purposes, it falls within the scope. The entity using it for those other purposes must ensure compliance, unless the system is already compliant. [2]\n- In the reverse direction, an AI system placed on the market for civilian or law enforcement purposes which is used, with or without modification, for military, defence or national security purposes does not fall within the scope. [2]",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.012004,
+      "error": ""
+    },
+    {
+      "id": "O1",
+      "type": "out_of_scope",
+      "question": "What is the VAT rate in Germany?",
+      "passed": true,
+      "expected": [],
+      "cited": [],
+      "declined": true,
+      "retrieved": null,
+      "sent": [
+        "Art. 99(4)",
+        "Art. 99(3)",
+        "Art. 99(5)",
+        "Art. 100(2)",
+        "Art. 100(3)"
+      ],
+      "retrieved_uncited": [
+        "Art. 99"
+      ],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't answer this. They cover administrative fines under the EU AI Act (Articles 99 and 100) and say nothing about VAT rates in Germany or any other tax matter.\n\nIf you have a question about the AI Act's penalties or other provisions, I'm happy to help with that.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.005802,
+      "error": ""
+    },
+    {
+      "id": "O2",
+      "type": "out_of_scope",
+      "question": "What is the maximum fine under the GDPR?",
+      "passed": true,
+      "expected": [],
+      "cited": [
+        "Art. 99(3)"
+      ],
+      "declined": true,
+      "retrieved": null,
+      "sent": [
+        "Art. 99(5)",
+        "Art. 99(3)",
+        "Art. 99(4)",
+        "Recital 168",
+        "Recital 169"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't answer this. They cover only the EU AI Act's penalty rules, not the GDPR, so I can't give a GDPR maximum fine from them.\n\nFor comparison, the AI Act's own top tier is in the excerpts: non-compliance with the Article 5 prohibitions is subject to administrative fines of up to EUR 35 000 000 or, for an undertaking, up to 7 % of total worldwide annual turnover for the preceding financial year, whichever is higher. [1] That figure is not a GDPR figure.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.007522,
+      "error": ""
+    },
+    {
+      "id": "O3",
+      "type": "out_of_scope",
+      "question": "Who owns the copyright in images our AI system generates?",
+      "passed": true,
+      "expected": [],
+      "cited": [
+        "Recital 105",
+        "Recital 106",
+        "Art. 50(2)"
+      ],
+      "declined": true,
+      "retrieved": null,
+      "sent": [
+        "Recital 105",
+        "Art. 50(2)",
+        "Recital 134",
+        "Recital 106",
+        "Recital 108"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't answer who owns the copyright in AI-generated images. None of them address authorship or ownership of outputs.\n\nWhat they do cover is related but different:\n\n- **Training data and copyright:** Any use of copyright protected content requires the authorisation of the rightsholder concerned unless relevant copyright exceptions and limitations apply. [1] Where rightsholders have expressly reserved their opt-out rights in an appropriate manner, providers of general-purpose AI models need to obtain an authorisation from rightsholders if they want to carry out text and data mining over such works. [1]\n- **Copyright policy for general-purpose AI models:** Providers of general-purpose AI models should put in place a policy to comply with Union law on copyright and related rights. [2] This applies regardless of the jurisdiction in which the copyright-relevant acts underpinning the training of those general-purpose AI models take place. [2]\n- **Labelling outputs:** Providers of AI systems generating synthetic audio, image, video or text content shall ensure that the outputs are marked in a machine-readable format and detectable as artificially generated or manipulated. [3] This is a transparency obligation, not a rule on ownership.\n\nThe excerpts give no basis for answering the ownership question, so I can't say more from them.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.011638,
+      "error": ""
+    },
+    {
+      "id": "O4",
+      "type": "out_of_scope",
+      "question": "Which AI law applies to our product in the United States?",
+      "passed": true,
+      "expected": [],
+      "cited": [
+        "Recital 3"
+      ],
+      "declined": true,
+      "retrieved": null,
+      "sent": [
+        "Art. 74(4)",
+        "Recital 170",
+        "Recital 87",
+        "Recital 3",
+        "Art. 2(8)"
+      ],
+      "retrieved_uncited": [
+        "Art. 2"
+      ],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts don't answer this. They contain only provisions of the EU AI Act (Regulation (EU) 2024/1689), and none of them address US law or which AI rules apply in the United States, so I can't say which US law applies to your product.\n\nThe excerpts do show that the Regulation is an EU instrument. It is based on Article 114 TFEU and aims to ensure a consistent and high level of protection throughout the Union through uniform obligations for operators. [1] Whether it reaches your product would depend on scope provisions (such as Article 2 on territorial application) that aren't included in the excerpts provided.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.007576,
+      "error": ""
+    },
+    {
+      "id": "O5",
+      "type": "out_of_scope",
+      "question": "Can we patent our AI model in the EU?",
+      "passed": true,
+      "expected": [],
+      "cited": [],
+      "declined": true,
+      "retrieved": null,
+      "sent": [
+        "Recital 8",
+        "Recital 106",
+        "Recital 1",
+        "Recital 138",
+        "Recital 144"
+      ],
+      "retrieved_uncited": [],
+      "outside_knowledge": [],
+      "refused": false,
+      "answer": "The excerpts you provided don't answer this question. They cover the Regulation's purpose and its innovation-support measures (such as regulatory sandboxes), plus a copyright-compliance policy for providers of general-purpose AI models. None of them address patenting or patentability of AI models.\n\nFor patent questions, you would need to consult the relevant patent law sources, which are not part of the excerpts here.",
+      "model": "claude-sonnet-5-5",
+      "cost_usd": 0.007668,
+      "error": ""
+    }
+  ]
+}
