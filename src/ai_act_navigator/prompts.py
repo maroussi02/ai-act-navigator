@@ -26,6 +26,8 @@ class PromptFileError(Exception):
 
 @dataclass(frozen=True)
 class Prompts:
+    """The prompt file's contents, plus the fingerprint of its text."""
+
     version: str  # e.g. "v1"; bump it whenever the text changes
     system: str  # the system prompt sent with every question
     sha256: str  # fingerprint of `system`: changes if even one character changes

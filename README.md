@@ -95,7 +95,7 @@ claude-sonnet-5-5 · 2426 tokens in, 96 out · cost $0.0058
 3. **Embed and store** (`embed.py`, `store.py`): an **embedding** is a list of numbers that captures what a text means, so texts with similar meaning end up close together. The model ([BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5)) runs locally, so no text leaves your machine. `ai-act index` downloads it once from Hugging Face (about 130 MB); `ai-act ask` then loads it in full offline mode, with no requests to Hugging Face. The vectors are saved in Chroma, a library that stores them as files in `data/chroma/`, with no account or server.
 4. **Search** (`search.py`): the question is embedded the same way, and the 5 closest chunks are picked.
 5. **Answer** (`answer.py`): the chunks go to Claude as *search result* blocks with citations enabled. Every numbered source in the answer is one of those chunks, with the exact quoted passage. (The prose could still name another article; the prompt forbids it, and AN-002 measures it.) If the chunks don't answer the question, Claude says so instead of guessing.
-   The instructions Claude gets live in one versioned file, [`prompts.toml`](src/ai_act_navigator/prompts.toml). Every eval result records the prompt version and a fingerprint (SHA-256) of its exact text, and a test fails if the text changes without a new version.
+   The instructions Claude gets live in one versioned file, [`prompts.toml`](src/ai_act_navigator/prompts.toml). From now on, every eval result records the prompt version and a fingerprint (SHA-256) of its exact text, and a test fails if the text changes without a new version. (The v1 baseline predates the fingerprint; v1's is listed in `tests/test_prompts.py`.)
 
 A question costs about $0.01 at list prices.
 

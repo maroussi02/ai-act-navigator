@@ -25,9 +25,11 @@ class Chunk:
 
 @dataclass(frozen=True)
 class Hit:
-    """One search result: a chunk and how close it is to the question.
+    """One search result: a chunk and how well it matches the question.
 
-    score is the cosine similarity: 1.0 = same meaning, 0.0 = unrelated.
+    Higher score = better match. What the number means depends on the search:
+    - meaning only (vector): cosine similarity, 1.0 = same meaning, 0.0 = unrelated;
+    - hybrid: the fused rank score from search.fuse, only useful for ordering.
     """
 
     chunk: Chunk

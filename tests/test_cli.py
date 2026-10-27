@@ -17,7 +17,7 @@ from ai_act_navigator.download import IntegrityError
 from ai_act_navigator.embed import ModelNotAvailableError
 from ai_act_navigator.golden import GoldenQuestion, GoldenSetError, load_golden
 from ai_act_navigator.models import Chunk, Hit
-from ai_act_navigator.prompts import PROMPT_SHA256
+from ai_act_navigator.prompts import PROMPT_SHA256, PROMPT_VERSION
 from ai_act_navigator.store import IndexMismatchError
 
 ANSWER = Answer(
@@ -35,8 +35,8 @@ def fake_pipeline(monkeypatch):
     """Replace the key check and the pipeline; record what the pipeline was called with."""
     calls = {}
 
-    def fake_ask(question, k, model, effort):
-        calls.update(question=question, k=k, model=model, effort=effort)
+    def fake_ask(question, k, search_mode, model, effort):
+        calls.update(question=question, k=k, search_mode=search_mode, model=model, effort=effort)
         return ANSWER
 
     monkeypatch.setattr(cli, "load_api_key", lambda: None)
@@ -54,8 +54,22 @@ def test_ask_prints_answer_sources_and_cost(fake_pipeline, capsys):
 
 
 def test_options_are_passed_to_the_pipeline(fake_pipeline):
-    cli.main(["ask", "q", "--k", "8", "--model", "claude-haiku-5-5", "--effort", "low"])
-    assert fake_pipeline == {"question": "q", "k": 8, "model": "claude-haiku-5-5", "effort": "low"}
+    cli.main(
+        ["ask", "q", "--k", "8", "--search", "vector", "--model", "claude-haiku-5-5"]
+        + ["--effort", "low"]
+    )
+    assert fake_pipeline == {
+        "question": "q",
+        "k": 8,
+        "search_mode": "vector",
+        "model": "claude-haiku-5-5",
+        "effort": "low",
+    }
+
+
+def test_search_is_hybrid_by_default(fake_pipeline):
+    cli.main(["ask", "q"])
+    assert fake_pipeline["search_mode"] == "hybrid"
 
 
 def test_quotes_option_shows_every_quote(fake_pipeline, capsys):
@@ -149,7 +163,7 @@ def test_index_problems_print_one_line_and_exit_1(monkeypatch, capsys, error, me
     assert "Traceback" not in err
 
 
-def fake_asker(k, model, effort):
+def fake_asker(k, search_mode, model, effort):
     """Answers every golden question by citing Art. 50(1), the chunk it 'found'."""
     hits = [Hit(Chunk("art-50-1", "article", "Art. 50(1)", "", "text", "u"), 0.5)]
     return lambda question: (hits, ANSWER)
@@ -183,7 +197,8 @@ def test_results_file_records_what_is_needed_to_rerun_the_score(fake_eval, tmp_p
 
     settings = json.loads(out.read_text())["settings"]
     assert settings["effort"] == "low"
-    assert settings["prompt_version"] == "v1"
+    assert settings["search"] == "hybrid"
+    assert settings["prompt_version"] == PROMPT_VERSION
     assert settings["prompt_sha256"] == PROMPT_SHA256
     assert settings["embedding_model"].startswith("BAAI/bge-small-en-v1.5@")
     assert len(settings["golden_set_sha256"]) == 64
@@ -192,14 +207,14 @@ def test_results_file_records_what_is_needed_to_rerun_the_score(fake_eval, tmp_p
 
 
 def test_eval_saves_partial_results_when_the_api_fails(fake_eval, monkeypatch, capsys, tmp_path):
-    def asker(k, model, effort):
+    def asker(k, search_mode, model, effort):
         answered = []
 
         def ask(question):
             if len(answered) == 3:
                 raise api_error(anthropic.RateLimitError, 429)
             answered.append(question)
-            return fake_asker(k, model, effort)(question)
+            return fake_asker(k, search_mode, model, effort)(question)
 
         return ask
 
@@ -240,3 +255,40 @@ def test_a_broken_golden_set_is_one_error_line(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert err.startswith("Error: golden-v1.json is not valid JSON")
     assert "Traceback" not in err
+
+
+class FakeSearcher:
+    """Finds Art. 50(1) for every question and records the settings it was called with."""
+
+    def __init__(self):
+        self.calls = []
+
+    def search(self, question, k, mode):
+        self.calls.append((k, mode))
+        return [Hit(Chunk("art-50-1", "article", "Art. 50(1)", "", "text", "u"), 0.5)]
+
+
+def test_search_only_checks_search_without_claude_or_api_key(fake_eval, monkeypatch, capsys):
+    searcher = FakeSearcher()
+    monkeypatch.setattr(cli, "make_searcher", lambda: searcher)
+
+    def no_key():
+        raise AssertionError("--search-only must not need the API key")
+
+    monkeypatch.setattr(cli, "load_api_key", no_key)
+    monkeypatch.setattr(cli, "make_asker", no_key)  # and must not build the Claude pipeline
+
+    assert cli.main(["eval", "--search-only", "--search", "vector", "--k", "3"]) == 0
+
+    out = capsys.readouterr().out
+    assert len(searcher.calls) == 15  # the 15 in-scope golden questions, none out of scope
+    assert set(searcher.calls) == {(3, "vector")}
+    assert "P1   found   sent Art. 50(1)" in out  # P1 expects Art. 50
+    assert "E1   MISSED  sent Art. 50(1)" in out  # E1 expects Art. 4
+    assert "Search found the expected article: 2/15" in out  # P1 and P5 expect Art. 50
+
+
+def test_search_only_refuses_out(fake_eval, monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(cli, "make_searcher", FakeSearcher)
+    assert cli.main(["eval", "--search-only", "--out", str(tmp_path / "x.json")]) == 1
+    assert "--search-only writes no results file" in capsys.readouterr().err

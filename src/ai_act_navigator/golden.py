@@ -27,9 +27,6 @@ QuestionType = Literal["exact_ref", "plain", "out_of_scope"]
 # The mix from AN-002, acceptance criterion 2: at least this many of each type.
 MIN_PER_TYPE: dict[QuestionType, int] = {"exact_ref": 5, "plain": 10, "out_of_scope": 5}
 
-# The part of a chunk ref that names the article or annex, e.g. "Art. 5" in
-# "Art. 5(1), point (f)", "Annex III" in "Annex III, point 1".
-_ARTICLE = re.compile(r"^(Art\. \d+|Annex [IVXL]+|Recital \d+)(?![\dIVXL])")
 # Expected sources are whole articles or annexes. Recitals explain the law but aren't
 # rules, so they don't count as "the right article".
 _SOURCE = re.compile(r"^(Art\. \d+|Annex [IVXL]+)$")
@@ -49,17 +46,6 @@ class GoldenQuestion:
     checked: bool  # True once answer and sources were checked against the official text
     origin: str = ""  # where the question came from, e.g. "hand check v1, Q1"
     note: str = ""
-
-
-def article_of(ref: str) -> str:
-    """The article (or annex, or recital) a chunk ref belongs to.
-
-    Example: "Art. 5(1), point (f)" -> "Art. 5", "Annex III, point 1" -> "Annex III"
-    """
-    match = _ARTICLE.match(ref)
-    if not match:
-        raise ValueError(f"Not a chunk ref: {ref!r}")
-    return match.group(1)
 
 
 def load_golden(path: Path = GOLDEN_PATH) -> list[GoldenQuestion]:
