@@ -4,12 +4,17 @@ Texts with similar meaning get similar numbers, even if they use different words
 "Must a chatbot say it's an AI?" lands close to Art. 50(1) ("...informed that they are
 interacting with an AI system..."), which is what makes search by meaning possible.
 
-The model runs locally on your machine. The first run downloads it once (about 130 MB)
-from Hugging Face into ~/.cache/huggingface. After that it loads from that folder without
-contacting Hugging Face, and no text ever leaves your computer.
+The model runs locally on your machine, so no text ever leaves your computer.
+`ai-act index` downloads it once (about 130 MB) from Hugging Face into
+~/.cache/huggingface. `ai-act ask` then loads it from that folder in full offline mode:
+no network requests to Hugging Face at all.
 """
 
-from sentence_transformers import SentenceTransformer
+import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # only for type hints; the real import happens inside load_model
+    from sentence_transformers import SentenceTransformer
 
 # Small, fast, good-quality English model. Swap it here to try another one.
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
@@ -24,21 +29,47 @@ MODEL_REVISION = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
 
-def load_model(model_name: str, revision: str) -> SentenceTransformer:
-    """Load the model from the local cache, and download it only if it isn't there yet.
+class ModelNotAvailableError(Exception):
+    """The embedding model is not on this computer and could not be downloaded."""
 
-    Without local_files_only, the library checks Hugging Face for updates on every start,
-    which took over a minute without internet. The pinned revision never changes, so the
-    cached copy is always the right one.
+
+def load_model(model_name: str, revision: str, allow_download: bool) -> "SentenceTransformer":
+    """Load the model from the local cache; download it only if allowed and not there yet.
+
+    allow_download=False is full offline mode: no network requests to Hugging Face at all.
+    local_files_only alone isn't enough, because the library still makes small requests of
+    its own (e.g. about once a day it fetches a list of known AI coding tools from Hugging
+    Face). HF_HUB_OFFLINE=1 switches those off too, but the library reads it only once, when
+    it is first imported. That's why sentence_transformers is imported here, after setting
+    it, and not at the top of the file. (In a program that already imported it, only
+    local_files_only applies. `ai-act ask` imports it here first; checked by hand.)
+
+    allow_download=True first tries the cache (0.4 s instead of over a minute without
+    internet), then downloads. The pinned revision never changes, so a cached copy is
+    always the right one.
     """
+    if not allow_download:
+        os.environ["HF_HUB_OFFLINE"] = "1"
+    from sentence_transformers import SentenceTransformer
+
     # trust_remote_code=False (the default) means we never run code shipped with the
     # model, we only load its weights. Kept explicit here for security.
     try:
         return SentenceTransformer(
             model_name, revision=revision, trust_remote_code=False, local_files_only=True
         )
-    except OSError:  # not in the cache yet: first run
+    except OSError as error:  # not in the cache yet
+        if not allow_download:
+            raise ModelNotAvailableError(
+                "The embedding model isn't downloaded yet. Run: uv run ai-act index"
+            ) from error
+    try:
         return SentenceTransformer(model_name, revision=revision, trust_remote_code=False)
+    except OSError as error:  # e.g. no internet
+        raise ModelNotAvailableError(
+            f"Could not download the embedding model {model_name} from Hugging Face. "
+            "Check your internet connection."
+        ) from error
 
 
 class Embedder:
@@ -48,11 +79,16 @@ class Embedder:
     e.g. the FakeEmbedder in the tests, which needs no model download.
     """
 
-    def __init__(self, model_name: str = MODEL_NAME, revision: str = MODEL_REVISION) -> None:
+    def __init__(
+        self,
+        model_name: str = MODEL_NAME,
+        revision: str = MODEL_REVISION,
+        allow_download: bool = True,
+    ) -> None:
         # e.g. "BAAI/bge-small-en-v1.5@5c38ec7...". The index records it, so search can
         # refuse to compare vectors made by two different models (they'd be meaningless).
         self.model_id = f"{model_name}@{revision}"
-        self._model = load_model(model_name, revision)
+        self._model = load_model(model_name, revision, allow_download)
 
     @property
     def max_tokens(self) -> int:

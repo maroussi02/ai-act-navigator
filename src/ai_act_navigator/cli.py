@@ -8,9 +8,10 @@
 Built with argparse, which comes with Python. It turns the words typed after `ai-act` into
 named settings (args.question, args.k, ...) and writes the --help text for us.
 
-Errors the user can fix (no key, empty index, no internet, ...) print one clear line and
-exit with code 1. Anything unexpected still shows the full traceback, so real bugs stay
-visible instead of being hidden behind a vague message.
+Exit codes: 0 = success, 1 = a problem the user can fix (no key, empty index, no internet,
+...), shown as one line starting with "Error:", 2 = wrong arguments (argparse prints the
+usage). Anything unexpected still shows the full traceback, so real bugs stay visible
+instead of being hidden behind a vague message.
 """
 
 import argparse
@@ -19,11 +20,19 @@ import sys
 from collections.abc import Sequence
 
 import anthropic
+import httpx
 
 from ai_act_navigator.answer import EFFORT, MODEL, Answer, AnswerError
+from ai_act_navigator.download import IntegrityError
+from ai_act_navigator.embed import ModelNotAvailableError
 from ai_act_navigator.paths import PROJECT_ROOT
 from ai_act_navigator.search import DEFAULT_K
 from ai_act_navigator.store import IndexMismatchError
+
+# Upper limit for --k. 50 chunks are roughly 8,000 to 22,000 tokens, about $0.02 to $0.05
+# of input per question with Sonnet. Without a limit, a typo like --k 900 would send almost
+# the whole law (~140,000 tokens, ~$0.30) with every question.
+MAX_K = 50
 
 
 class UserError(Exception):
@@ -43,9 +52,9 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("question", nargs="*", help='your question, e.g. "What is banned?"')
     ask.add_argument(
         "--k",
-        type=positive_int,
+        type=chunk_count,
         default=DEFAULT_K,
-        help=f"how many chunks of the law to give Claude (default {DEFAULT_K})",
+        help=f"how many chunks of the law to give Claude, 1 to {MAX_K} (default {DEFAULT_K})",
     )
     ask.add_argument("--model", default=MODEL, help=f"Claude model (default {MODEL})")
     ask.add_argument(
@@ -66,23 +75,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def positive_int(value: str) -> int:
-    """argparse type for --k: a whole number of at least 1."""
+def chunk_count(value: str) -> int:
+    """argparse type for --k: a whole number from 1 to MAX_K."""
     number = int(value)
-    if number < 1:
-        raise argparse.ArgumentTypeError("must be 1 or more")
+    if not 1 <= number <= MAX_K:
+        raise argparse.ArgumentTypeError(f"must be between 1 and {MAX_K}")
     return number
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one command and return the exit code: 0 = success, 1 = error.
 
+    (Wrong arguments never get here: argparse prints the usage and exits with code 2.)
     `argv` lets tests pass arguments directly; normally it comes from the terminal.
     """
     args = build_parser().parse_args(argv)
     try:
         return args.handler(args)
-    except (UserError, IndexMismatchError, AnswerError) as error:
+    except (UserError, IndexMismatchError, AnswerError, ModelNotAvailableError) as error:
         return fail(str(error))
     except anthropic.AuthenticationError:
         return fail("The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in .env.")
@@ -133,7 +143,9 @@ def ask_question(question: str, k: int, model: str, effort: str) -> Answer:
     from ai_act_navigator.search import search
     from ai_act_navigator.store import VectorStore
 
-    embedder = Embedder()
+    # allow_download=False: asking never contacts Hugging Face. If the model is missing,
+    # the error says to run `ai-act index`, which downloads it.
+    embedder = Embedder(allow_download=False)
     hits = search(question, embedder, VectorStore(embedder.model_id), k=k)
     return answer(question, hits, anthropic.Anthropic(), model=model, effort=effort)
 
@@ -158,7 +170,15 @@ def format_answer(result: Answer, show_quotes: bool = False) -> str:
 def run_index(args: argparse.Namespace) -> int:
     from ai_act_navigator.index import main as build_index
 
-    build_index()
+    try:
+        build_index()
+    except httpx.HTTPError as error:  # no internet, timeout, or the server answered 404, 503, ...
+        raise UserError(
+            f"Could not download the AI Act from the EU Publications Office ({error}). "
+            "Check your internet connection."
+        ) from error
+    except IntegrityError as error:
+        raise UserError(f"The downloaded AI Act text isn't the expected file. {error}") from error
     return 0
 
 

@@ -9,15 +9,15 @@ The "Pre-check" column is Claude's own first pass. The verdict is yours.
 
 | # | Question | Sources cited | Pre-check (Claude) | Supported? (yes / no) | Note |
 |---|---|---|---|---|---|
-| 1 | Does a chatbot have to tell users it is an AI? | Art. 50(1), Recital 132 | Citations match. ⚠️ Last sentence names Art. 50(2) without citing it (from outside the excerpts). | | |
+| 1 | Does a chatbot have to tell users it is an AI? | Art. 50(1), Recital 132 | Citations match. ⚠️ Retrieved but uncited: the last sentence names Art. 50(2), which was among the 5 chunks sent but carries no [number]. | | |
 | 2 | Which AI practices are prohibited? | Art. 5(1), point (a), Art. 5(1), point (b), Art. 5(1), point (d), Art. 5(1), point (e), Art. 5(1), point (f) | Citations match. ⚠️ Incomplete: only 5 of 8 banned practices were retrieved; the answer says so. | | |
 | 3 | What makes an AI system high-risk? | Art. 6(1), Annex III, point 2, Art. 15(1), Art. 9(6) | Citations match. ⚠️ Incomplete: only 1 Annex III area retrieved; the answer says so. | | |
-| 4 | What are the maximum fines for breaking the prohibitions? | Art. 99(3), Art. 100(2), Art. 99(4) | Citations match (EUR 35M / 7 %, EUR 1.5M for EU bodies, EUR 15M / 3 %). | | |
+| 4 | What are the maximum fines for breaking the prohibitions? | Art. 99(3), Art. 100(2), Art. 99(4) | Citations match (EUR 35M / 7 %, EUR 1.5M for EU bodies, EUR 15M / 3 %). ⚠️ Incomplete: for SMEs and start-ups the *lower* of the two amounts applies (Art. 99(6)), which wasn't retrieved, so the answer doesn't mention it. | | |
 | 5 | Do deepfakes have to be labelled? | Art. 50(4), Recital 134 | Citations match, incl. the text rule in Art. 50(4) second subparagraph. | | |
 | 6 | What obligations do providers of general-purpose AI models have? | Art. 53(1), Art. 53(3), Art. 54(2), Art. 53(2), Art. 54(6) | Citations match. One uncited conclusion (points (c), (d) not exempt), which follows from Art. 53(2). | | |
 | 7 | Who counts as a provider under the AI Act? | Art. 3, point (3) | Citation matches the definition word for word. | | |
-| 8 | Is emotion recognition in the workplace allowed? | Recital 44, Art. 3, point (39), Recital 18, Art. 50(3) | ⚠️ Known search miss: relies on Recital 44, not the ban itself (Art. 5(1)(f)). The answer says so. | | |
-| 9 | When do the rules for high-risk AI systems start to apply? | Art. 111(2), Art. 6(5) | ⚠️ Known search miss: Art. 113 not retrieved. The answer says it can't give the date. Cited dates correct. | | |
+| 8 | Is emotion recognition in the workplace allowed? | Recital 44, Art. 3, point (39), Recital 18, Art. 50(3) | ⚠️ Known search miss: relies on Recital 44, not the ban itself (Art. 5(1)(f)). The answer says so. ⚠️ Check [4]: "Outside the workplace and education context" is Claude's own framing; Art. 50(3) applies to deployers of emotion recognition in general and doesn't mention the workplace. | | |
+| 9 | When do the rules for high-risk AI systems start to apply? | Art. 111(2), Art. 6(5) | ⚠️ Known search miss: Art. 113 not retrieved. The answer says it can't give the date. Cited dates correct. ⚠️ Outside knowledge: "Article 113, which would set it" isn't in any chunk sent (Art. 111(2) only mentions Art. 113(3), point (a), for Article 5). | | |
 | 10 | What is the VAT rate in Germany? | none | Correctly declines, no sources. | | |
 
 **Summary (fill in):** __ of 10 answers fully supported by their citations.
@@ -25,7 +25,9 @@ The "Pre-check" column is Claude's own first pass. The verdict is yours.
 **Known limits found:**
 - **Search misses (fix in AN-003):** questions 8 and 9 don't retrieve the key article.
 - **Incomplete lists:** questions 2 and 3 only get part of the list, because only 5 chunks are sent.
-- **Uncited outside knowledge:** question 1 names an article it didn't cite (track in AN-002).
+- **Retrieved but uncited:** question 1 names Art. 50(2), which was sent but not cited.
+- **Outside knowledge:** question 9 says what Art. 113 does, though Art. 113 wasn't sent. Question 8 adds its own framing to a cited source.
+- AN-002 will count these two failure types separately: "retrieved but uncited" means the source was there, "outside knowledge" means the model added something the excerpts don't contain.
 
 ## Answers
 

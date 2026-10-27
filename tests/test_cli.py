@@ -8,8 +8,10 @@ import anthropic
 import httpx
 import pytest
 
-from ai_act_navigator import cli
+from ai_act_navigator import cli, index
 from ai_act_navigator.answer import Answer, AnswerError, Citation
+from ai_act_navigator.download import IntegrityError
+from ai_act_navigator.embed import ModelNotAvailableError
 from ai_act_navigator.store import IndexMismatchError
 
 ANSWER = Answer(
@@ -56,10 +58,16 @@ def test_quotes_option_shows_every_quote(fake_pipeline, capsys):
     assert '      "quoted a"\n      "b"' in out
 
 
-@pytest.mark.parametrize("bad_k", ["0", "-1", "two"])
-def test_k_must_be_a_positive_number(bad_k, capsys):
-    with pytest.raises(SystemExit):  # argparse prints usage and exits
+@pytest.mark.parametrize("bad_k", ["0", "-1", "two", "51"])
+def test_k_must_be_between_1_and_50(bad_k):
+    with pytest.raises(SystemExit) as exit_info:  # argparse prints usage and exits
         cli.main(["ask", "q", "--k", bad_k])
+    assert exit_info.value.code == 2  # argparse's code for wrong arguments
+
+
+def test_k_of_50_is_allowed(fake_pipeline):
+    cli.main(["ask", "q", "--k", "50"])
+    assert fake_pipeline["k"] == 50
 
 
 def test_empty_question_is_a_clear_error(capsys):
@@ -84,6 +92,7 @@ def api_error(cls, status):
     [
         (IndexMismatchError("The index is empty."), "The index is empty."),
         (AnswerError("The answer was cut off."), "The answer was cut off."),
+        (ModelNotAvailableError("Run: uv run ai-act index"), "Run: uv run ai-act index"),
         (api_error(anthropic.AuthenticationError, 401), "API key was rejected"),
         (api_error(anthropic.RateLimitError, 429), "Rate limit or spending limit"),
         (api_error(anthropic.InternalServerError, 500), "returned an error (500)"),
@@ -113,3 +122,22 @@ def test_unexpected_errors_are_not_hidden(monkeypatch):
     monkeypatch.setattr(cli, "ask_question", bug)
     with pytest.raises(ZeroDivisionError):  # real bugs still show their traceback
         cli.main(["ask", "q"])
+
+
+@pytest.mark.parametrize(
+    ("error", "message"),
+    [
+        (httpx.ConnectError("no route to host"), "Could not download the AI Act"),
+        (IntegrityError("Expected SHA-256 aaa, got bbb."), "isn't the expected file"),
+        (ModelNotAvailableError("Could not download the embedding model"), "embedding model"),
+    ],
+)
+def test_index_problems_print_one_line_and_exit_1(monkeypatch, capsys, error, message):
+    def broken():
+        raise error
+
+    monkeypatch.setattr(index, "main", broken)  # run_index imports index.main when it runs
+    assert cli.main(["index"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("Error: ") and message in err
+    assert "Traceback" not in err
