@@ -3,6 +3,7 @@
     uv run ai-act index                      # build the search index (once, ~20 s)
     uv run ai-act ask "Does a chatbot have to tell users it is an AI?"
     uv run ai-act ask --quotes "..."         # also show the exact quoted passages
+    uv run ai-act eval                       # score the golden set (20 questions, ~$0.20)
     uv run ai-act --help                     # all commands and options
 
 Built with argparse, which comes with Python. It turns the words typed after `ai-act` into
@@ -18,6 +19,8 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
+from pathlib import Path
 
 import anthropic
 import httpx
@@ -25,7 +28,17 @@ import httpx
 from ai_act_navigator.answer import EFFORT, MODEL, Answer, AnswerError
 from ai_act_navigator.download import IntegrityError
 from ai_act_navigator.embed import ModelNotAvailableError
+from ai_act_navigator.evaluate import (
+    RESULTS_DIR,
+    Ask,
+    QuestionResult,
+    evaluate_one,
+    save_results,
+)
+from ai_act_navigator.golden import GOLDEN_PATH, load_golden
+from ai_act_navigator.models import Hit
 from ai_act_navigator.paths import PROJECT_ROOT
+from ai_act_navigator.prompts import PROMPT_VERSION
 from ai_act_navigator.search import DEFAULT_K
 from ai_act_navigator.store import IndexMismatchError
 
@@ -50,19 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ask = commands.add_parser("ask", help="answer a question with cited sources")
     ask.add_argument("question", nargs="*", help='your question, e.g. "What is banned?"')
-    ask.add_argument(
-        "--k",
-        type=chunk_count,
-        default=DEFAULT_K,
-        help=f"how many chunks of the law to give Claude, 1 to {MAX_K} (default {DEFAULT_K})",
-    )
-    ask.add_argument("--model", default=MODEL, help=f"Claude model (default {MODEL})")
-    ask.add_argument(
-        "--effort",
-        default=EFFORT,
-        choices=["low", "medium", "high", "xhigh", "max"],
-        help=f"how much Claude thinks first (default {EFFORT})",
-    )
+    add_pipeline_options(ask)
     ask.add_argument(
         "--quotes",
         action="store_true",
@@ -70,9 +71,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ask.set_defaults(handler=run_ask)
 
+    evaluate = commands.add_parser(
+        "eval", help="score the answers on the golden set (20 questions, about $0.20)"
+    )
+    add_pipeline_options(evaluate)
+    evaluate.add_argument(
+        "--out",
+        type=Path,
+        help="results file (default: a new file in evals/results/)",
+    )
+    evaluate.set_defaults(handler=run_eval)
+
     index = commands.add_parser("index", help="download the law and build the search index")
     index.set_defaults(handler=run_index)
     return parser
+
+
+def add_pipeline_options(command: argparse.ArgumentParser) -> None:
+    """The settings `ask` and `eval` share, so eval scores exactly what ask would answer."""
+    command.add_argument(
+        "--k",
+        type=chunk_count,
+        default=DEFAULT_K,
+        help=f"how many chunks of the law to give Claude, 1 to {MAX_K} (default {DEFAULT_K})",
+    )
+    command.add_argument("--model", default=MODEL, help=f"Claude model (default {MODEL})")
+    command.add_argument(
+        "--effort",
+        default=EFFORT,
+        choices=["low", "medium", "high", "xhigh", "max"],
+        help=f"how much Claude thinks first (default {EFFORT})",
+    )
 
 
 def chunk_count(value: str) -> int:
@@ -133,10 +162,17 @@ def load_api_key() -> None:
 
 
 def ask_question(question: str, k: int, model: str, effort: str) -> Answer:
-    """The full pipeline: find the closest chunks, then let Claude answer from them.
+    """The full pipeline: find the closest chunks, then let Claude answer from them."""
+    _, result = make_asker(k, model, effort)(question)
+    return result
 
-    Imports are inside the function because loading the embedding model and its libraries
-    takes a few seconds; `ai-act --help` shouldn't have to wait for that.
+
+def make_asker(k: int, model: str, effort: str) -> Ask:
+    """Load the pipeline once and return a function that answers one question with it.
+
+    `eval` asks 20 questions; loading the embedding model once instead of 20 times saves
+    about a minute. Imports are inside the function because loading the model and its
+    libraries takes a few seconds; `ai-act --help` shouldn't have to wait for that.
     """
     from ai_act_navigator.answer import answer
     from ai_act_navigator.embed import Embedder
@@ -146,8 +182,79 @@ def ask_question(question: str, k: int, model: str, effort: str) -> Answer:
     # allow_download=False: asking never contacts Hugging Face. If the model is missing,
     # the error says to run `ai-act index`, which downloads it.
     embedder = Embedder(allow_download=False)
-    hits = search(question, embedder, VectorStore(embedder.model_id), k=k)
-    return answer(question, hits, anthropic.Anthropic(), model=model, effort=effort)
+    store = VectorStore(embedder.model_id)
+    client = anthropic.Anthropic()
+
+    def ask(question: str) -> tuple[list[Hit], Answer]:
+        hits = search(question, embedder, store, k=k)
+        return hits, answer(question, hits, client, model=model, effort=effort)
+
+    return ask
+
+
+def run_eval(args: argparse.Namespace) -> int:
+    questions = load_golden()
+    unchecked = [q.id for q in questions if not q.checked]
+    if unchecked:  # a score on unchecked answers would be a guess, not a baseline
+        raise UserError(f"Golden set not checked by hand yet: {', '.join(unchecked)}")
+
+    load_api_key()
+    started = datetime.now(UTC)
+    ask = make_asker(args.k, args.model, args.effort)
+    print(f"Asking {len(questions)} questions ({args.model}, effort {args.effort}, k {args.k})")
+    results = []
+    for question in questions:
+        result = evaluate_one(question, ask)
+        print(format_result_line(result))
+        results.append(result)
+
+    path = args.out or RESULTS_DIR / (
+        f"{started:%Y-%m-%d-%H%M}-{args.model}-{args.effort}-k{args.k}.json"
+    )
+    settings = {
+        "date": started.isoformat(timespec="seconds"),
+        "golden_set": GOLDEN_PATH.name,
+        "model": args.model,
+        "effort": args.effort,
+        "k": args.k,
+        "prompt_version": PROMPT_VERSION,
+    }
+    summary = save_results(results, settings, path)
+    print(format_summary(summary, path))
+    return 0
+
+
+def format_result_line(result: QuestionResult) -> str:
+    """One line per question while eval runs, e.g. "P1   pass  cited Art. 50(1)"."""
+    verdict = "pass" if result.passed else "FAIL"
+    if result.error:
+        detail = f"error: {result.error}"
+    elif result.refused:
+        detail = "safety decline"
+    elif result.cited:
+        detail = f"cited {', '.join(result.cited)}"
+    else:
+        detail = "cited nothing"
+    if result.retrieved is False:
+        detail += f" · search missed {', '.join(result.expected)}"
+    return f"{result.id:<4} {verdict}  {detail}"
+
+
+def format_summary(summary: dict, path: Path) -> str:
+    types = ", ".join(f"{t} {s['passed']}/{s['total']}" for t, s in summary["by_type"].items())
+    found = summary["retrieved"]
+    return "\n".join(
+        [
+            "",
+            f"Score: {summary['passed']}/{summary['total']} ({types})",
+            f"Search found the expected article: {found['found']}/{found['total']}",
+            f"Wrongly declined: {summary['wrongly_declined']} · "
+            f"retrieved but uncited: {summary['with_retrieved_uncited']} · "
+            f"outside knowledge: {summary['with_outside_knowledge']} · "
+            f"errors: {summary['errors']}",
+            f"Cost: ${summary['cost_usd']:.4f} · saved to {path}",
+        ]
+    )
 
 
 def format_answer(result: Answer, show_quotes: bool = False) -> str:
