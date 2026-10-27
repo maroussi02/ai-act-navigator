@@ -99,10 +99,11 @@ A question costs about $0.01 at list prices.
 
 ## Quality so far
 
-[Hand check v1](docs/hand-check-v1.md): 10 real questions, each source checked against what the answer claims. Known limits, to be fixed in the next tickets:
+[Hand check v1](docs/hand-check-v1.md): 10 real questions, each source checked against what the answer claims. **Result: 10 of 10 answers supported by their citations.** Known limits, to be fixed in the next tickets:
 
 - **Search misses (AN-003):** "Is emotion recognition at work allowed?" and "When do the high-risk rules apply?" don't retrieve the key article (Art. 5(1)(f), Art. 113). The answers say so instead of guessing.
 - **Long lists are incomplete:** only 5 chunks are sent, so "Which practices are prohibited?" gets 5 of the 8. Fixed by searching wider and reranking (AN-003).
+- **Gaps and additions:** some answers leave out an exception or a rule that wasn't retrieved (e.g. the SME fines rule, Art. 99(6)), or mention an article they didn't cite (Art. 50(2), Art. 113). AN-002 tracks these separately.
 - **Measured, not guessed:** a 20-question golden set with an automatic score comes next (AN-002).
 
 ## Development
