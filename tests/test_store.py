@@ -27,6 +27,15 @@ def test_search_returns_full_chunks_best_first(store):
     assert hits[1].score == pytest.approx(0.0)
 
 
+def test_all_chunks_returns_every_stored_chunk(store):
+    assert sorted(store.all_chunks(), key=lambda c: c.id) == sorted(CHUNKS, key=lambda c: c.id)
+
+
+def test_all_chunks_of_an_empty_index_is_a_clear_error(tmp_path):
+    with pytest.raises(IndexMismatchError, match="The index is empty"):
+        VectorStore("model-a", tmp_path).all_chunks()
+
+
 def test_rerunning_upsert_creates_no_duplicates(store):
     store.upsert(CHUNKS, VECTORS)
     assert store.count() == 2

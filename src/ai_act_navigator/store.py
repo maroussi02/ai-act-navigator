@@ -75,6 +75,32 @@ class VectorStore:
 
     def search(self, query_embedding: list[float], k: int = 5) -> list[Hit]:
         """The k chunks closest in meaning to the query, best first."""
+        self._check_ready()
+        result = self._collection.query(query_embeddings=[query_embedding], n_results=k)
+        # Chroma answers for a list of queries; we sent one, so we take element [0] of each.
+        rows = zip(
+            result["ids"][0],
+            result["documents"][0],
+            result["metadatas"][0],
+            result["distances"][0],
+            strict=True,
+        )
+        return [
+            # cosine distance -> similarity (1.0 = same meaning)
+            Hit(chunk=_to_chunk(chunk_id, text, meta), score=1.0 - distance)
+            for chunk_id, text, meta, distance in rows
+        ]
+
+    def all_chunks(self) -> list[Chunk]:
+        """Every stored chunk, in no particular order. Keyword search is built from these,
+        so it always searches exactly the chunks the vector index holds."""
+        self._check_ready()
+        result = self._collection.get(include=["documents", "metadatas"])
+        rows = zip(result["ids"], result["documents"], result["metadatas"], strict=True)
+        return [_to_chunk(chunk_id, text, meta) for chunk_id, text, meta in rows]
+
+    def _check_ready(self) -> None:
+        """Raise IndexMismatchError unless the index is built, with the model searching it."""
         built_with = (self._collection.metadata or {}).get("embedding_model")
         if self.count() == 0:
             raise IndexMismatchError("The index is empty. Build it with: uv run ai-act index")
@@ -89,26 +115,14 @@ class VectorStore:
                 f"{self.embedding_model}. Rebuild it: uv run ai-act index"
             )
 
-        result = self._collection.query(query_embeddings=[query_embedding], n_results=k)
-        # Chroma answers for a list of queries; we sent one, so we take element [0] of each.
-        rows = zip(
-            result["ids"][0],
-            result["documents"][0],
-            result["metadatas"][0],
-            result["distances"][0],
-            strict=True,
-        )
-        return [
-            Hit(
-                chunk=Chunk(
-                    id=chunk_id,
-                    type=meta["type"],
-                    ref=meta["ref"],
-                    title=meta["title"],
-                    text=text,
-                    url=meta["url"],
-                ),
-                score=1.0 - distance,  # cosine distance -> similarity (1.0 = same meaning)
-            )
-            for chunk_id, text, meta, distance in rows
-        ]
+
+def _to_chunk(chunk_id: str, text: str, meta: dict) -> Chunk:
+    """Rebuild a Chunk from what Chroma stores: id, text, and the citation metadata."""
+    return Chunk(
+        id=chunk_id,
+        type=meta["type"],
+        ref=meta["ref"],
+        title=meta["title"],
+        text=text,
+        url=meta["url"],
+    )

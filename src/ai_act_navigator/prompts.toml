@@ -4,8 +4,9 @@
 # text's fingerprint to KNOWN_PROMPTS in tests/test_prompts.py; that test fails until you do.
 # Every eval result records the version and the fingerprint, so scores stay comparable.
 #
-# A backslash at the end of a line joins it with the next one (like in the Python file this
-# text came from), so the long lines stay readable here without changing what Claude sees.
+# A backslash at the end of a line joins it with the next one, so long lines stay readable
+# here. Careful: TOML also drops the next line's leading spaces and any blank lines after
+# the backslash, and any other backslash in the text is an error.
 
 version = "v1"
 

@@ -4,6 +4,7 @@
     uv run ai-act ask "Does a chatbot have to tell users it is an AI?"
     uv run ai-act ask --quotes "..."         # also show the exact quoted passages
     uv run ai-act eval                       # score the golden set (20 questions, ~$0.20)
+    uv run ai-act eval --search-only         # only check search (15 questions, free)
     uv run ai-act --help                     # all commands and options
 
 Built with argparse, which comes with Python. It turns the words typed after `ai-act` into
@@ -37,14 +38,21 @@ from ai_act_navigator.evaluate import (
     QuestionResult,
     evaluate_one,
     file_sha256,
+    found_expected,
     git_commit,
     save_results,
 )
-from ai_act_navigator.golden import GOLDEN_PATH, GoldenSetError, check_mix, load_golden
+from ai_act_navigator.golden import (
+    GOLDEN_PATH,
+    GoldenQuestion,
+    GoldenSetError,
+    check_mix,
+    load_golden,
+)
 from ai_act_navigator.models import Hit
 from ai_act_navigator.paths import PROJECT_ROOT
 from ai_act_navigator.prompts import PROMPT_SHA256, PROMPT_VERSION
-from ai_act_navigator.search import DEFAULT_K
+from ai_act_navigator.search import DEFAULT_K, DEFAULT_MODE, Searcher
 from ai_act_navigator.store import IndexMismatchError
 
 # Upper limit for --k. 50 chunks are roughly 8,000 to 22,000 tokens, about $0.02 to $0.05
@@ -85,6 +93,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="results file (default: a new file in evals/results/)",
     )
+    evaluate.add_argument(
+        "--search-only",
+        action="store_true",
+        help="only check whether search finds the expected article: no Claude calls, free, "
+        "no results file",
+    )
     evaluate.set_defaults(handler=run_eval)
 
     index = commands.add_parser("index", help="download the law and build the search index")
@@ -99,6 +113,13 @@ def add_pipeline_options(command: argparse.ArgumentParser) -> None:
         type=chunk_count,
         default=DEFAULT_K,
         help=f"how many chunks of the law to give Claude, 1 to {MAX_K} (default {DEFAULT_K})",
+    )
+    command.add_argument(
+        "--search",
+        default=DEFAULT_MODE,
+        choices=["hybrid", "vector"],
+        help="hybrid = meaning + keywords + named articles; vector = meaning only, as in v1 "
+        f"(default {DEFAULT_MODE})",
     )
     command.add_argument("--model", default=MODEL, help=f"Claude model (default {MODEL})")
     command.add_argument(
@@ -158,7 +179,9 @@ def run_ask(args: argparse.Namespace) -> int:
         raise UserError('Please ask a question, e.g.: uv run ai-act ask "What is banned?"')
 
     load_api_key()
-    result = ask_question(question, k=args.k, model=args.model, effort=args.effort)
+    result = ask_question(
+        question, k=args.k, search_mode=args.search, model=args.model, effort=args.effort
+    )
     print(format_answer(result, show_quotes=args.quotes))
     return 0
 
@@ -172,32 +195,40 @@ def load_api_key() -> None:
         raise UserError("ANTHROPIC_API_KEY is missing. Copy .env.example to .env and add your key.")
 
 
-def ask_question(question: str, k: int, model: str, effort: str) -> Answer:
-    """The full pipeline: find the closest chunks, then let Claude answer from them."""
-    _, result = make_asker(k, model, effort)(question)
+def ask_question(question: str, k: int, search_mode: str, model: str, effort: str) -> Answer:
+    """The full pipeline: find the best chunks, then let Claude answer from them."""
+    _, result = make_asker(k, search_mode, model, effort)(question)
     return result
 
 
-def make_asker(k: int, model: str, effort: str) -> Ask:
+def make_searcher() -> Searcher:
+    """Load the embedding model and the index once, ready to search.
+
+    The model is imported inside the function because loading it and its libraries takes a
+    few seconds; `ai-act --help` shouldn't have to wait for that.
+    """
+    from ai_act_navigator.embed import Embedder
+    from ai_act_navigator.store import VectorStore
+
+    # allow_download=False: searching never contacts Hugging Face. If the model is missing,
+    # the error says to run `ai-act index`, which downloads it.
+    embedder = Embedder(allow_download=False)
+    return Searcher(embedder, VectorStore(embedder.model_id))
+
+
+def make_asker(k: int, search_mode: str, model: str, effort: str) -> Ask:
     """Load the pipeline once and return a function that answers one question with it.
 
     `eval` asks 20 questions; loading the embedding model once instead of 20 times saves
-    about a minute. Imports are inside the function because loading the model and its
-    libraries takes a few seconds; `ai-act --help` shouldn't have to wait for that.
+    about a minute.
     """
     from ai_act_navigator.answer import answer
-    from ai_act_navigator.embed import Embedder
-    from ai_act_navigator.search import search
-    from ai_act_navigator.store import VectorStore
 
-    # allow_download=False: asking never contacts Hugging Face. If the model is missing,
-    # the error says to run `ai-act index`, which downloads it.
-    embedder = Embedder(allow_download=False)
-    store = VectorStore(embedder.model_id)
+    searcher = make_searcher()
     client = anthropic.Anthropic()
 
     def ask(question: str) -> tuple[list[Hit], Answer]:
-        hits = search(question, embedder, store, k=k)
+        hits = searcher.search(question, k=k, mode=search_mode)
         return hits, answer(question, hits, client, model=model, effort=effort)
 
     return ask
@@ -209,16 +240,20 @@ def run_eval(args: argparse.Namespace) -> int:
     if unchecked:  # a score on unchecked answers would be a guess, not a baseline
         raise UserError(f"Golden set not checked by hand yet: {', '.join(unchecked)}")
     check_mix(questions)
+    if args.search_only:
+        if args.out:
+            raise UserError("--search-only writes no results file, so --out can't be used with it.")
+        return run_search_only(questions, k=args.k, search_mode=args.search)
 
     started = datetime.now(UTC)
     path = args.out or RESULTS_DIR / (
-        f"{started:%Y-%m-%d-%H%M%S}-{args.model}-{args.effort}-k{args.k}.json"
+        f"{started:%Y-%m-%d-%H%M%S}-{args.model}-{args.effort}-k{args.k}-{args.search}.json"
     )
     if path.exists():  # e.g. --out pointing at the committed baseline
         raise UserError(f"{path} already exists. Choose another --out or delete it first.")
 
     load_api_key()
-    ask = make_asker(args.k, args.model, args.effort)
+    ask = make_asker(args.k, args.search, args.model, args.effort)
     # Everything needed to rerun this exact score later: code, data, models, settings.
     settings = {
         "date": started.isoformat(timespec="seconds"),
@@ -230,10 +265,14 @@ def run_eval(args: argparse.Namespace) -> int:
         "model": args.model,
         "effort": args.effort,
         "k": args.k,
+        "search": args.search,
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": PROMPT_SHA256,  # the exact prompt text this run used
     }
-    print(f"Asking {len(questions)} questions ({args.model}, effort {args.effort}, k {args.k})")
+    print(
+        f"Asking {len(questions)} questions ({args.model}, effort {args.effort}, k {args.k}, "
+        f"search {args.search})"
+    )
     results = []
     try:
         for question in questions:
@@ -252,6 +291,27 @@ def run_eval(args: argparse.Namespace) -> int:
 
     summary = save_results(results, settings, path)
     print(format_summary(summary, path))
+    return 0
+
+
+def run_search_only(questions: list[GoldenQuestion], k: int, search_mode: str) -> int:
+    """Check only search: is an expected article among the k chunks sent to Claude?
+
+    No Claude calls, so it's free and needs no API key. Out-of-scope questions are skipped:
+    they have no expected article. Use it to compare search changes before paying for a
+    full eval.
+    """
+    in_scope = [q for q in questions if q.type != "out_of_scope"]
+    searcher = make_searcher()
+    print(f"Search only, no Claude calls ({len(in_scope)} questions, search {search_mode}, k {k})")
+    found = 0
+    for question in in_scope:
+        hits = searcher.search(question.question, k=k, mode=search_mode)
+        ok = found_expected(question, hits)
+        found += ok
+        sent = ", ".join(hit.chunk.ref for hit in hits)
+        print(f"{question.id:<4} {'found ' if ok else 'MISSED'}  sent {sent}")
+    print(f"\nSearch found the expected article: {found}/{len(in_scope)}")
     return 0
 
 

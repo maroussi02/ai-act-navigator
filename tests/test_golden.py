@@ -14,10 +14,10 @@ from ai_act_navigator.download import DEFAULT_PATH
 from ai_act_navigator.golden import (
     MIN_PER_TYPE,
     GoldenSetError,
-    article_of,
     check_mix,
     load_golden,
 )
+from ai_act_navigator.refs import article_of
 
 
 def write_golden(tmp_path, *questions):
@@ -50,26 +50,6 @@ def test_golden_set_has_20_questions_in_the_right_mix():
 def test_every_question_checked_by_hand():
     unchecked = [q.id for q in load_golden() if not q.checked]
     assert not unchecked, f"Not checked by hand yet: {', '.join(unchecked)}"
-
-
-@pytest.mark.parametrize(
-    ("ref", "article"),
-    [
-        ("Art. 50(1)", "Art. 50"),
-        ("Art. 5(1), point (f)", "Art. 5"),
-        ("Art. 3, point (3)", "Art. 3"),
-        ("Art. 113", "Art. 113"),
-        ("Annex III, point 1", "Annex III"),
-        ("Recital 132", "Recital 132"),
-    ],
-)
-def test_article_of(ref, article):
-    assert article_of(ref) == article
-
-
-def test_article_of_rejects_text_that_is_no_ref():
-    with pytest.raises(ValueError):
-        article_of("Article 50")
 
 
 def test_loads_a_valid_file(tmp_path):

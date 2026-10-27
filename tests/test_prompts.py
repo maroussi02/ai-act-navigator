@@ -30,6 +30,11 @@ def test_prompt_text_matches_its_version():
     )
 
 
+def test_every_version_has_its_own_fingerprint():
+    # Two versions with the same text would make "v1 vs v2" scores look different for no reason.
+    assert len(set(KNOWN_PROMPTS.values())) == len(KNOWN_PROMPTS)
+
+
 def test_a_valid_file_loads_version_text_and_fingerprint(tmp_path):
     path = tmp_path / "prompts.toml"
     path.write_text('version = "v9"\nsystem = """\nBe brief.\n"""\n', encoding="utf-8")

@@ -10,7 +10,6 @@ from ai_act_navigator.answer import Answer, AnswerError, Citation
 from ai_act_navigator.evaluate import (
     evaluate_one,
     is_decline,
-    mentioned_articles,
     save_results,
     score,
     summarize,
@@ -123,21 +122,6 @@ def test_retrieved_but_uncited():
     result = score(CHATBOT, [hit("Art. 50(1)"), hit("Art. 99(3)")], reply(text, "Art. 50(1)"))
     assert result.retrieved_uncited == ("Art. 99",)
     assert result.outside_knowledge == ()
-
-
-@pytest.mark.parametrize(
-    ("text", "found"),
-    [
-        ("Art. 50(1) and Article 6(1), point (a)", {"Art. 50", "Art. 6"}),
-        ("listed in Annex III and Annex I", {"Annex III", "Annex I"}),
-        ("Articles 99 and 100", {"Art. 99"}),  # known limit: only the first number
-        ("Article 4(3) of Directive (EU) 2019/790", set()),  # another law
-        ("Article 2 of Regulation (EU) 2016/679", set()),
-        ("No article here. Recital 132.", set()),
-    ],
-)
-def test_mentioned_articles(text, found):
-    assert mentioned_articles(text) == found
 
 
 def test_a_cut_off_answer_is_recorded_as_a_fail():

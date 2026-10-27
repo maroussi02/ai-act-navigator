@@ -38,9 +38,10 @@ from typing import Any
 import anthropic
 
 from ai_act_navigator.answer import Answer, AnswerError
-from ai_act_navigator.golden import MIN_PER_TYPE, GoldenQuestion, article_of
+from ai_act_navigator.golden import MIN_PER_TYPE, GoldenQuestion
 from ai_act_navigator.models import Hit
 from ai_act_navigator.paths import PROJECT_ROOT
+from ai_act_navigator.refs import article_of, mentioned_articles
 
 RESULTS_DIR = PROJECT_ROOT / "evals" / "results"
 
@@ -48,10 +49,6 @@ RESULTS_DIR = PROJECT_ROOT / "evals" / "results"
 # pipeline; tests pass a fake.
 Ask = Callable[[str], tuple[list[Hit], Answer]]
 
-# "Art. 50", "Article 6(1)", "Annex III" in a text.
-_MENTION = re.compile(r"\b(?:Art\.|Articles?)\s+(\d+)|\bAnnex\s+([IVXL]+)\b")
-# What follows a mention of *another* law, e.g. "Article 4(3) of Directive (EU) 2019/790".
-_OTHER_LAW = re.compile(r"(?:\(\w+\))*(?:,? points? \(\w+\))?\s+of\s+(?:Directive|Regulation)")
 # A decline in the opening paragraph: "excerpts" + "don't"/"do not" + "answer" or "so I can't".
 _DECLINE = re.compile(
     r"\bexcerpts\b[^\n]*?\b(?:don't|do not|doesn't|does not)\b[^\n]*?"
@@ -80,24 +77,14 @@ class QuestionResult:
     error: str = ""  # set if no answer came back (cut off, API error); counts as a fail
 
 
-def mentioned_articles(text: str) -> set[str]:
-    """Articles and annexes of the AI Act that the text names, e.g. {"Art. 50", "Annex III"}.
-
-    Plain pattern matching, so it can miss unusual wording ("Articles 99 and 100" only
-    finds Art. 99). Mentions of other laws ("Article 4(3) of Directive ...") are skipped.
-    """
-    found = set()
-    for match in _MENTION.finditer(text):
-        if _OTHER_LAW.match(text, match.end()):
-            continue
-        article, annex = match.groups()
-        found.add(f"Art. {article}" if article else f"Annex {annex}")
-    return found
-
-
 def is_decline(text: str) -> bool:
     """True if the answer's opening paragraph says the excerpts don't answer the question."""
     return bool(_DECLINE.search(text.strip().split("\n", 1)[0]))
+
+
+def found_expected(question: GoldenQuestion, hits: list[Hit]) -> bool:
+    """True if search sent Claude at least one chunk of an expected article."""
+    return bool({article_of(hit.chunk.ref) for hit in hits} & set(question.sources))
 
 
 def score(question: GoldenQuestion, hits: list[Hit], answer: Answer) -> QuestionResult:
@@ -116,7 +103,7 @@ def score(question: GoldenQuestion, hits: list[Hit], answer: Answer) -> Question
         retrieved = None
     else:
         passed = bool(cited & expected) and not declined
-        retrieved = bool(sent & expected)
+        retrieved = found_expected(question, hits)
 
     return QuestionResult(
         id=question.id,
