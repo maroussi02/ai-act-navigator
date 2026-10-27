@@ -100,12 +100,32 @@ A question costs about $0.01 at list prices.
 
 ## Quality so far
 
+### Golden set v1 baseline (AN-002)
+
+[20 questions](evals/golden-v1.json) with known correct answers and source articles, each checked by hand against the official text. `uv run ai-act eval` asks all 20 and scores them in code, no LLM judge:
+
+- An answer to a question the AI Act covers passes if it cites one of the expected articles. Article level is enough: `Art. 50(1)` counts for `Art. 50`.
+- An answer to a question the AI Act doesn't cover passes if it says the excerpts don't answer it.
+
+**v1 score: 14 of 20** (Sonnet 5.5, effort medium, k = 5, prompt v1, run on 2026-10-27, cost $0.20, [results file](evals/results/2026-10-27-171944-claude-sonnet-5-5-medium-k5.json)):
+
+| Question type | Passed |
+|---|---|
+| Exact reference ("What does Article 4 require?") | 1 of 5 |
+| Plain language ("Does a chatbot have to tell users it is an AI?") | 8 of 10 |
+| Not in the AI Act ("What is the VAT rate in Germany?") | 5 of 5 |
+
+**All 6 failures are search misses:** the expected article was never among the 5 chunks sent to Claude (search found it for 9 of 15 questions). 5 of the 6 answers say the excerpts don't cover the question; the sixth (emotion recognition at work) answers from related passages instead. No answer declined when the article was there, and none named an article from outside the excerpts. Search is the bottleneck, which is what AN-003 fixes.
+
+Limits of the automatic score: it checks *which* articles are cited, not whether each claim is right (that is the hand check below, and the LLM judge in AN-004). A decline is recognised by its opening sentence ("The excerpts don't answer this…").
+
+### Hand check v1
+
 [Hand check v1](docs/hand-check-v1.md): 10 real questions, each source checked against what the answer claims. **Result: 10 of 10 answers supported by their citations.** Known limits, to be fixed in the next tickets:
 
 - **Search misses (AN-003):** "Is emotion recognition at work allowed?" and "When do the high-risk rules apply?" don't retrieve the key article (Art. 5(1)(f), Art. 113). The answers say so instead of guessing.
 - **Long lists are incomplete:** only 5 chunks are sent, so "Which practices are prohibited?" gets 5 of the 8. Fixed by searching wider and reranking (AN-003).
-- **Gaps and additions:** some answers leave out an exception or a rule that wasn't retrieved (e.g. the SME fines rule, Art. 99(6)), or mention an article they didn't cite (Art. 50(2), Art. 113). AN-002 tracks these separately.
-- **Measured, not guessed:** a 20-question golden set with an automatic score comes next (AN-002).
+- **Gaps and additions:** some answers leave out an exception or a rule that wasn't retrieved (e.g. the SME fines rule, Art. 99(6)), or mention an article they didn't cite (Art. 50(2), Art. 113). `ai-act eval` counts mentions of articles that were sent but not cited, and of articles that weren't in the excerpts at all.
 
 ## Development
 

@@ -5,7 +5,7 @@ feature built for RAG). With citations enabled, Claude's answer comes back in pi
 and every piece that uses a chunk carries a citation pointing to that chunk's position in
 our list plus the exact quoted text. So the numbered sources can only ever be chunks we
 sent. (The answer *text* could still mention another article by name; the prompt tells
-Claude not to, and AN-002's checks will measure how often it happens.)
+Claude not to, and `ai-act eval` counts how often it happens.)
 
 Used by the command-line tool:  uv run ai-act ask "Does a chatbot have to tell users it is an AI?"
 """
@@ -19,11 +19,11 @@ from anthropic.types.beta import BetaMessage
 from ai_act_navigator.models import Hit
 from ai_act_navigator.prompts import SYSTEM_PROMPT
 
-# One setting to switch models. AN-002 compares Haiku, Sonnet and Opus on the golden set.
+# One setting to switch models. `ai-act eval --model ...` scores any model on the golden set.
 MODEL = "claude-sonnet-5-5"
 
-# How much the model thinks before answering. "medium" is a balanced start; AN-002 will
-# measure whether "low" is good enough (cheaper and faster).
+# How much the model thinks before answering. "medium" is a balanced start;
+# `ai-act eval --effort low` shows whether "low" is good enough (cheaper and faster).
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 EFFORT: Effort = "medium"
 
