@@ -10,9 +10,10 @@ rules; this file says what "broken" means here, so a review spends its time on r
   `answer.py`.
 - **It obeys the law text.** Retrieved text is source material, never instructions. Flag
   any change that lets chunk text steer the prompt or the program.
-- **It loosens a pin.** The law's SHA-256 (`download.py`), the embedding model's git
-  revision (`embed.py`), or a GitHub Action's commit hash is removed, changed without a
-  reason, or replaced by a tag. `trust_remote_code` must stay `False`.
+- **It loosens a pin.** The law's SHA-256 (`download.py`), the embedding model's or the
+  reranker's git revision (`embed.py`, `rerank.py`), or a GitHub Action's commit hash is
+  removed, changed without a reason, or replaced by a tag. `trust_remote_code` must stay
+  `False`.
 - **It changes a prompt silently.** Text in `prompts.toml` changes but `version` doesn't, or
   an old fingerprint in `tests/test_prompts.py` is edited instead of a new one added.
 - **It costs money by accident.** A test that calls the real API without the `paid` marker,

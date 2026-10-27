@@ -31,7 +31,7 @@ uv run ai-act eval --search-only       # only check search, no Claude calls (fre
 |---|---|---|
 | `--quotes` | Show the exact passages Claude quoted under each source | off |
 | `--k N` | How many chunks of the law Claude gets (1 to 50) | 5 |
-| `--search` | `hybrid` (meaning + keywords + named articles) or `vector` (meaning only, as in v1) | `hybrid` |
+| `--search` | `rerank` (hybrid + reranker), `hybrid` (meaning + keywords + named articles) or `vector` (meaning only, as in v1) | `rerank` |
 | `--model` | Claude model | `claude-sonnet-5-5` |
 | `--effort` | How much Claude thinks first: `low`, `medium`, `high`, `xhigh`, `max` | `medium` |
 
@@ -100,8 +100,9 @@ claude-sonnet-5-5 · 2426 tokens in, 96 out · cost $0.0058
    - **by keywords** (BM25, the classic search-engine formula): chunks sharing the question's words, rare words counting most. "Article 4", "Art. 4" and "article 4" all count as one word, so a reference matches however it is typed;
    - **named articles**: if the question names an article or annex ("What does Article 4 require?"), all its chunks are candidates.
 
-   The lists are merged with *Reciprocal Rank Fusion*: each chunk scores 1 / (60 + its rank) in every list it is in, and the scores add up. The 5 best chunks go to Claude.
-5. **Answer** (`answer.py`): the chunks go to Claude as *search result* blocks with citations enabled. Every numbered source in the answer is one of those chunks, with the exact quoted passage. (The prose could still name another article; the prompt forbids it, and AN-002 measures it.) If the chunks don't answer the question, Claude says so instead of guessing.
+   The lists are merged with *Reciprocal Rank Fusion*: each chunk scores 1 / (60 + its rank) in every list it is in, and the scores add up.
+5. **Rerank** (`rerank.py`): a *reranker* (cross-encoder) reads the question together with each of the 30 best candidates and scores how well that chunk answers it. That's slower than search but more precise, so it puts the key paragraph first. The model ([cross-encoder/ms-marco-MiniLM-L6-v2](https://huggingface.co/cross-encoder/ms-marco-MiniLM-L6-v2), Apache-2.0, about 90 MB) runs locally and is pinned like the embedding model; `ai-act index` downloads it once and `ai-act ask` loads it offline. It takes about 0.15 s per question on an Apple M5. A reranker doesn't know that "Article 4" means the chunk cited as "Art. 4", so an article the question names always keeps one of the 5 places. The 5 best chunks go to Claude.
+6. **Answer** (`answer.py`): the chunks go to Claude as *search result* blocks with citations enabled. Every numbered source in the answer is one of those chunks, with the exact quoted passage. (The prose could still name another article; the prompt forbids it, and AN-002 measures it.) If the chunks don't answer the question, Claude says so instead of guessing.
    The instructions Claude gets live in one versioned file, [`prompts.toml`](src/ai_act_navigator/prompts.toml). From now on, every eval result records the prompt version and a fingerprint (SHA-256) of its exact text, and a test fails if the text changes without a new version. (The v1 baseline predates the fingerprint; v1's is listed in `tests/test_prompts.py`.)
 
 A question costs about $0.01 at list prices.
@@ -134,11 +135,14 @@ Same 20 questions, same model (Sonnet 5.5, effort medium, k = 5), prompt v1. "Se
 | Change | Score | Exact reference | Plain language | Not in the AI Act | Search found | Results |
 |---|---|---|---|---|---|---|
 | v1: meaning search | 14/20 | 1/5 | 8/10 | 5/5 | 9/15 | [file](evals/results/2026-10-27-171944-claude-sonnet-5-5-medium-k5.json) |
-| Combined search (AN-003b) | **15/20** | **5/5** | 5/10 | 5/5 | **14/15** | [file](evals/results/2026-10-27-194440-claude-sonnet-5-5-medium-k5-hybrid.json) |
+| Combined search (AN-003b) | 15/20 | 5/5 | 5/10 | 5/5 | 14/15 | [file](evals/results/2026-10-27-194440-claude-sonnet-5-5-medium-k5-hybrid.json) |
+| Reranker (AN-003c) | **18/20** | **5/5** | **8/10** | **5/5** | **14/15** | [file](evals/results/2026-10-27-204856-claude-sonnet-5-5-medium-k5-rerank.json) |
 
 **Combined search:** every question that names an article now finds and cites it (1/5 → 5/5). Emotion recognition at work (P8) now passes too. But 4 plain-language questions that passed in v1 now fail (P1, P3, P6, P7). All 4 decline although their article was sent: search found the right *article* but not its key *paragraph*. Example: "Does a chatbot have to tell users it is an AI?" gets Art. 50(4) (deepfakes) instead of Art. 50(1) (chatbots), and the answer says the excerpts don't include the rule. Merging rewards chunks that several lists rank fairly high, which can push out meaning search's single best hit: those paragraphs ended up at ranks 6 to 17. Putting the best of the candidates first is the reranker's job (next step). The remaining search miss is P9 ("When do the high-risk rules start to apply?"): nothing in its wording points to Art. 113.
 
-The search columns are free to check: `uv run ai-act eval --search-only` (add `--search vector` for v1). Every step is measured on the same 20 questions, so a better score can partly reflect fitting them; to limit that, the search settings are standard values (BM25 k1 = 1.5, b = 0.75; fusion constant 60), not tuned on these questions.
+**Reranker:** P3, P6 and P7 pass again, because their key paragraph (Annex III, Art. 53(1), Art. 3, point (3)) is back in the top 5, and the fines question now cites Art. 99(3), the EUR 35 million rule. Two failures remain. P1 (chatbots): the reranker still prefers Art. 50(4) (deepfakes) over Art. 50(1), and the answer declines. P9: the search miss above. The model was picked on these same questions, by a rule fixed before comparing: the small model unless the large one ([BAAI/bge-reranker-base](https://huggingface.co/BAAI/bge-reranker-base), 1.1 GB) brought back at least 2 more key paragraphs; both brought back 3 of 4.
+
+The search columns are free to check: `uv run ai-act eval --search-only` (add `--search vector` for v1). Every step is measured on the same 20 questions, so a better score can partly reflect fitting them. To limit that, the search settings are standard values (BM25 k1 = 1.5, b = 0.75; fusion constant 60), not tuned on these questions. Three choices did look at them: the reranker model (see above), how many candidates it rescores (30, because the key paragraphs were at ranks 6 to 17), and keeping named articles in the top 5 (the reranker dropped Art. 4 and Art. 113). A held-out set of new questions would show how much of the gain is real.
 
 ### Hand check v1
 
@@ -164,7 +168,7 @@ CI runs the secret scan, lint, format check, tests and smoke tests on every pull
 
 | Type | What it checks | Where |
 |---|---|---|
-| Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_load_model.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_cli.py`, `test_paid_guard.py`, `test_load_chunks.py`, `test_paths.py`, `test_golden.py` (also fails until every golden-set question is checked by hand), `test_evaluate.py`, `test_prompts.py` (also fails if the prompt text changes without a new version), `test_refs.py`, `test_keyword.py` |
-| Integration | The parts together on real data or the real model | `test_full_text.py` (all parts found, no text lost, nothing cut off), `test_embed.py`, `test_named_articles.py` (a question naming an article finds it, even with meaning search switched off) |
+| Unit | One function alone, small or fake input, milliseconds | `test_chunk.py`, `test_download.py`, `test_load_model.py`, `test_index.py`, `test_store.py`, `test_search.py`, `test_answer.py` (fake Claude client), `test_cli.py`, `test_paid_guard.py`, `test_load_chunks.py`, `test_paths.py`, `test_golden.py` (also fails until every golden-set question is checked by hand), `test_evaluate.py`, `test_prompts.py` (also fails if the prompt text changes without a new version), `test_refs.py`, `test_keyword.py`, `test_rerank.py` (fake model) |
+| Integration | The parts together on real data or the real model | `test_full_text.py` (all parts found, no text lost, nothing cut off), `test_embed.py`, `test_named_articles.py` (a question naming an article finds it, even with meaning search switched off, before and after reranking), `test_rerank_real.py` (the real reranker puts the key paragraph first) |
 | Smoke | The real commands run and produce output | CI steps "Smoke test" (`ai-act --help`, `ai-act index`) |
 | Paid smoke | One real question through the full pipeline cites Art. 50(1) | `test_live_answer.py`, run by hand with `--run-paid -m paid` |
