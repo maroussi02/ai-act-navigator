@@ -4,6 +4,8 @@
 `capsys` captures what the command prints, so we can check the exact output.
 """
 
+import json
+
 import anthropic
 import httpx
 import pytest
@@ -12,6 +14,8 @@ from ai_act_navigator import cli, index
 from ai_act_navigator.answer import Answer, AnswerError, Citation
 from ai_act_navigator.download import IntegrityError
 from ai_act_navigator.embed import ModelNotAvailableError
+from ai_act_navigator.golden import GoldenQuestion
+from ai_act_navigator.models import Chunk, Hit
 from ai_act_navigator.store import IndexMismatchError
 
 ANSWER = Answer(
@@ -141,3 +145,33 @@ def test_index_problems_print_one_line_and_exit_1(monkeypatch, capsys, error, me
     err = capsys.readouterr().err
     assert err.startswith("Error: ") and message in err
     assert "Traceback" not in err
+
+
+def fake_asker(k, model, effort):
+    """Answers every golden question by citing Art. 50(1), the chunk it 'found'."""
+    hits = [Hit(Chunk("art-50-1", "article", "Art. 50(1)", "", "text", "u"), 0.5)]
+    return lambda question: (hits, ANSWER)
+
+
+def test_eval_scores_every_question_and_saves_the_results(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(cli, "load_api_key", lambda: None)
+    monkeypatch.setattr(cli, "make_asker", fake_asker)
+    out = tmp_path / "run.json"
+
+    assert cli.main(["eval", "--out", str(out), "--effort", "low"]) == 0
+
+    printed = capsys.readouterr().out
+    report = json.loads(out.read_text())
+    assert len(report["results"]) == 20
+    assert report["settings"]["effort"] == "low"
+    assert report["settings"]["prompt_version"] == "v1"
+    assert "P1   pass  cited Art. 50(1)" in printed  # P1 expects Art. 50
+    assert "O1   FAIL  cited Art. 50(1)" in printed  # out of scope, but cited something
+    assert f"Score: {report['summary']['passed']}/20" in printed
+
+
+def test_eval_refuses_an_unchecked_golden_set(monkeypatch, capsys):
+    unchecked = GoldenQuestion("P1", "plain", "q", "a", ("Art. 50",), checked=False)
+    monkeypatch.setattr(cli, "load_golden", lambda: [unchecked])
+    assert cli.main(["eval"]) == 1
+    assert "not checked by hand yet: P1" in capsys.readouterr().err
