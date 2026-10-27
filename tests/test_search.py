@@ -23,8 +23,10 @@ class FakeQueryEmbedder:
 @pytest.fixture
 def searcher(tmp_path):
     store = VectorStore("fake-model", tmp_path)
-    # Art. 4's vector is far from every question, so meaning search ranks it last.
-    store.upsert([CHATBOT, FINES, LITERACY], [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    # By meaning, a chatbot question finds CHATBOT (similarity 1.0), then FINES (0.6), then
+    # LITERACY (0.0): no ties, so the order is the same on every run. Art. 4's vector is far
+    # from every question, so meaning search always ranks it last.
+    store.upsert([CHATBOT, FINES, LITERACY], [[1.0, 0.0, 0.0], [0.6, 0.8, 0.0], [0.0, 0.0, 1.0]])
     return Searcher(FakeQueryEmbedder(), store)
 
 
